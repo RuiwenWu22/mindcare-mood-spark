@@ -297,7 +297,7 @@ export function analyzeEntries(entries: Entry[]): Insight {
   if (has("relationship"))
     suggestions.push("不急着立刻回应，先把想说的写下来，明天再看一次会更清楚。");
   if (has("alone")) suggestions.push("独处时给自己一个轻的锚点：散步、听一首熟悉的歌或写三行字。");
-  if (has("self")) suggestions.push("试着把"我应该"换成"我可以"，今天只完成一件小事也算数。");
+  if (has("self")) suggestions.push("试着把「我应该」换成「我可以」，今天只完成一件小事也算数。");
   if (avgIntensity >= 7) suggestions.push("情绪强度较高时，先做 2 分钟呼吸练习，再决定下一步。");
   if (suggestions.length === 0)
     suggestions.push("保持现在的节奏，每天记录一次，就已经是很好的自我照顾。");
@@ -318,7 +318,7 @@ export const DAILY_PROMPTS = [
   "你已经比昨天多撑过了一天，这本身就值得被肯定。",
   "不必急着变好，先让自己被理解，就是一种进展。",
   "今天如果只做成一件小事，那就让它是好好吃一顿饭。",
-  "把"我应该"换成"我可以"，你会轻松一点。",
+  "把「我应该」换成「我可以」，你会轻松一点。",
   "难过来的时候，先陪着它，而不是赶走它。",
   "你不是一个人在面对这些，求助也是一种能力。",
   "深呼吸三次，把注意力放回此刻的身体上。",
