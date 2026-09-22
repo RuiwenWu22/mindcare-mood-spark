@@ -174,6 +174,46 @@ export function saveEntries(entries: Entry[]) {
 export const sortByNewest = (entries: Entry[]) =>
   [...entries].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
 
+/* ---------------- CSV 导出 ---------------- */
+
+const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
+
+/** 把记录转成带 BOM 的 CSV 文本（Excel 打开中文不乱码） */
+export function entriesToCsv(entries: Entry[]): string {
+  const header = ["记录时间", "情绪", "强度（1-10）", "心情笔记", "触发因素"];
+  const rows = sortByNewest(entries).map((e) => {
+    const mood = moodOf(e.mood);
+    const when = new Date(e.createdAt);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const time = `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
+    return [
+      time,
+      mood.label,
+      String(e.intensity),
+      e.note,
+      e.triggers.map(triggerLabel).join("、"),
+    ];
+  });
+  const lines = [header, ...rows].map((row) => row.map(csvCell).join(","));
+  return "\uFEFF" + lines.join("\r\n");
+}
+
+/** 触发浏览器下载 */
+export function downloadCsv(entries: Entry[]) {
+  if (typeof window === "undefined" || entries.length === 0) return;
+  const blob = new Blob([entriesToCsv(entries)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  a.href = url;
+  a.download = `mindcare-情绪记录-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function formatDate(iso: string) {
   const d = new Date(iso);
   const today = new Date();
