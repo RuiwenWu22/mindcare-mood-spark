@@ -34,7 +34,7 @@ function TrendChart({ points }: { points: { label: string; score: number | null;
   const line = filled.map((c, i) => `${i === 0 ? "M" : "L"}${c.x},${c.y}`).join(" ");
   const area =
     filled.length > 1
-      ? `${line} L${filled[filled.length - 1].x},${h - pad} L${filled[0].x},${h - pad} Z`
+      ? `${line} L${filled[filled.length - 1]!.x},${h - pad} L${filled[0]!.x},${h - pad} Z`
       : "";
 
   return (
@@ -87,7 +87,7 @@ function InsightsPage() {
   const points = days.map((d) => {
     if (d.entries.length === 0) return { label: d.label, score: null };
     const score = d.entries.reduce((s, e) => s + entryScore(e), 0) / d.entries.length;
-    const strongest = [...d.entries].sort((a, b) => b.intensity - a.intensity)[0];
+    const strongest = [...d.entries].sort((a, b) => b.intensity - a.intensity)[0]!;
     return { label: d.label, score, emoji: moodOf(strongest.mood).emoji };
   });
 

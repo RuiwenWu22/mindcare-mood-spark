@@ -36,7 +36,7 @@ export const MOODS: Mood[] = [
   { key: "stressed", emoji: "😫", label: "压力很大", valence: -1, color: "var(--mood-stressed)" },
 ];
 
-export const moodOf = (key: MoodKey): Mood => MOODS.find((m) => m.key === key) ?? MOODS[3];
+export const moodOf = (key: MoodKey): Mood => MOODS.find((m) => m.key === key) ?? (MOODS[3] as Mood);
 
 export type TriggerKey =
   | "work"
@@ -264,7 +264,7 @@ export function analyzeEntries(entries: Entry[]): Insight {
 
   const recent = sortByNewest(entries).slice(0, 10);
   const dist = moodDistribution(recent);
-  const top = dist[0];
+  const top = dist[0]!;
   const triggers = triggerRanking(recent);
   const topTrigger = triggers[0];
   const avgIntensity =

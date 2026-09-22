@@ -20,11 +20,11 @@ const PHASES = [
   { name: "吸气", seconds: 4, scale: 1 },
   { name: "停留", seconds: 2, scale: 1 },
   { name: "呼气", seconds: 6, scale: 0.62 },
-] as const;
+];
 
 function BreathingSession({ onClose }: { onClose: () => void }) {
   const [phase, setPhase] = useState(0);
-  const [left, setLeft] = useState(PHASES[0].seconds);
+  const [left, setLeft] = useState<number>(PHASES[0]!.seconds);
   const [cycles, setCycles] = useState(0);
   const phaseRef = useRef(0);
 
@@ -36,13 +36,13 @@ function BreathingSession({ onClose }: { onClose: () => void }) {
         phaseRef.current = next;
         setPhase(next);
         if (next === 0) setCycles((c) => c + 1);
-        return PHASES[next].seconds;
+        return PHASES[next]!.seconds;
       });
     }, 1000);
     return () => clearInterval(id);
   }, []);
 
-  const current = PHASES[phase];
+  const current = PHASES[phase]!;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 px-6 backdrop-blur-xl">
