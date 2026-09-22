@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Download, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { MoodComposer } from "@/components/mood-composer";
 import { useEntries } from "@/hooks/use-entries";
-import { formatDate, moodOf, triggerLabel } from "@/lib/mood";
+import { downloadCsv, formatDate, moodOf, triggerLabel } from "@/lib/mood";
 
 export const Route = createFileRoute("/journal")({
   head: () => ({
