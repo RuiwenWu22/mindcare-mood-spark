@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Download, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { MoodComposer } from "@/components/mood-composer";
 import { useEntries } from "@/hooks/use-entries";
-import { formatDate, moodOf, triggerLabel } from "@/lib/mood";
+import { downloadCsv, formatDate, moodOf, triggerLabel } from "@/lib/mood";
 
 export const Route = createFileRoute("/journal")({
   head: () => ({
@@ -32,13 +32,30 @@ function JournalPage() {
             {ready ? `你一共记录了 ${entries.length} 条感受。` : "正在读取你的记录……"}
           </p>
         </div>
-        <button
-          onClick={() => setComposing((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition-transform hover:-translate-y-0.5"
-        >
-          {composing ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {composing ? "收起" : "新建记录"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              if (entries.length === 0) {
+                toast("还没有可以导出的记录");
+                return;
+              }
+              downloadCsv(entries);
+              toast("情绪记录已导出为 CSV 🌿");
+            }}
+            disabled={!ready || entries.length === 0}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            导出 CSV
+          </button>
+          <button
+            onClick={() => setComposing((v) => !v)}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition-transform hover:-translate-y-0.5"
+          >
+            {composing ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {composing ? "收起" : "新建记录"}
+          </button>
+        </div>
       </header>
 
       {composing && <MoodComposer title="记录一条新的感受" />}
