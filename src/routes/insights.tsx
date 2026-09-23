@@ -150,10 +150,10 @@ function InsightsPage() {
         </section>
 
         <section className="card-soft px-6 py-6">
-          <h2 className="font-display text-lg font-semibold">可能的触发因素</h2>
+          <h2 className="font-display text-lg font-semibold">触发因素频率排行</h2>
           {triggers.length === 0 ? (
             <p className="mt-5 text-sm text-muted-foreground">
-              还没有识别到明显的触发因素，记录时多写一句会更清楚。
+              记录时勾选触发因素标签，这里就会出现排行。
             </p>
           ) : (
             <ul className="mt-5 space-y-3">
@@ -173,6 +173,65 @@ function InsightsPage() {
           )}
         </section>
       </div>
+
+      {breakdown.length > 0 && (
+        <section className="card-soft px-6 py-6 sm:px-8">
+          <h2 className="font-display text-lg font-semibold">触发因素对应的情绪分布</h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            每一条代表这个标签下，各种情绪出现的比例。
+          </p>
+          <ul className="mt-6 space-y-5">
+            {breakdown.map((b) => (
+              <li key={b.key}>
+                <div className="flex items-baseline justify-between text-sm">
+                  <span className="font-medium">{b.label}</span>
+                  <span className="text-xs text-muted-foreground">{b.count} 条记录</span>
+                </div>
+                <div className="mt-2 flex h-3 overflow-hidden rounded-full bg-secondary">
+                  {b.segments.map((s) => (
+                    <span
+                      key={s.mood.key}
+                      title={`${s.mood.label} ${s.percent}%`}
+                      style={{ width: `${s.percent}%`, backgroundColor: s.mood.color }}
+                    />
+                  ))}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  {b.segments.map((s) => (
+                    <span key={s.mood.key} className="flex items-center gap-1">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ backgroundColor: s.mood.color }}
+                      />
+                      {s.mood.label} {s.percent}%
+                    </span>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="card-soft px-6 py-6 sm:px-8">
+        <h2 className="font-display text-lg font-semibold">一天里的情绪强度</h2>
+        <p className="mt-1.5 text-sm text-muted-foreground">按记录时间分成四个时段的平均强度。</p>
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {slots.map((s) => (
+            <div key={s.key} className="rounded-2xl bg-secondary/50 px-4 py-4 text-center">
+              <p className="text-xl">{s.emoji}</p>
+              <p className="mt-1 text-sm">{s.label}</p>
+              <p className="mt-2 font-display text-2xl font-medium">
+                {s.avg === null ? "—" : s.avg}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {s.count === 0 ? "暂无记录" : `${s.count} 条 · 平均强度`}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
 
       <section className="rounded-3xl border border-border bg-primary-soft/70 px-6 py-7 shadow-[var(--shadow-soft)] sm:px-8">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
