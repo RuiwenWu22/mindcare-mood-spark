@@ -145,7 +145,10 @@ function CarePage() {
 
       <DailyPrompt />
 
-      {breathing && <BreathingSession onClose={() => setBreathing(false)} />}
+      {breathing && (
+        <BreathingSession plan={BREATHING_PLANS[breathing]!} onClose={() => setBreathing(null)} />
+      )}
+
     </div>
   );
 }
