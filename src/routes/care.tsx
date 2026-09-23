@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { Footprints, Moon, Music, Wind, X } from "lucide-react";
+import { useState } from "react";
+import { Footprints, Moon, Music, Wind } from "lucide-react";
 import { DailyPrompt } from "@/components/daily-prompt";
+import { BreathingSession } from "@/components/breathing-session";
+import { BREATHING_PLANS } from "@/lib/care-recs";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/care")({
   head: () => ({
