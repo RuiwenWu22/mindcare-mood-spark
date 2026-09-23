@@ -16,70 +16,8 @@ export const Route = createFileRoute("/care")({
   component: CarePage,
 });
 
-const PHASES = [
-  { name: "吸气", seconds: 4, scale: 1 },
-  { name: "停留", seconds: 2, scale: 1 },
-  { name: "呼气", seconds: 6, scale: 0.62 },
-];
+const PLAN_KEYS = ["slow", "box", "relax478"] as const;
 
-function BreathingSession({ onClose }: { onClose: () => void }) {
-  const [phase, setPhase] = useState(0);
-  const [left, setLeft] = useState<number>(PHASES[0]!.seconds);
-  const [cycles, setCycles] = useState(0);
-  const phaseRef = useRef(0);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setLeft((prev) => {
-        if (prev > 1) return prev - 1;
-        const next = (phaseRef.current + 1) % PHASES.length;
-        phaseRef.current = next;
-        setPhase(next);
-        if (next === 0) setCycles((c) => c + 1);
-        return PHASES[next]!.seconds;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const current = PHASES[phase]!;
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 px-6 backdrop-blur-xl">
-      <button
-        onClick={onClose}
-        aria-label="结束练习"
-        className="absolute right-5 top-5 rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary"
-      >
-        <X className="h-5 w-5" />
-      </button>
-
-      <div className="flex h-64 w-64 items-center justify-center">
-        <div
-          className="flex h-64 w-64 items-center justify-center rounded-full bg-primary-soft"
-          style={{
-            transform: `scale(${current.scale})`,
-            transition: `transform ${current.seconds}s ease-in-out`,
-          }}
-        >
-          <div className="text-center">
-            <p className="font-display text-2xl font-semibold">{current.name}</p>
-            <p className="mt-1 text-4xl font-light tabular-nums">{left}</p>
-          </div>
-        </div>
-      </div>
-
-      <p className="mt-10 text-sm text-muted-foreground">吸气 4 秒 · 停留 2 秒 · 呼气 6 秒</p>
-      <p className="mt-2 text-sm text-muted-foreground">已完成 {cycles} 个循环</p>
-      <button
-        onClick={onClose}
-        className="mt-8 rounded-full border border-border px-6 py-2.5 text-sm transition-colors hover:bg-secondary"
-      >
-        结束练习
-      </button>
-    </div>
-  );
-}
 
 const MUSIC = [
   { title: "Calm Morning", desc: "清晨的环境音与轻缓和弦", minutes: 12, emoji: "🌤️" },
