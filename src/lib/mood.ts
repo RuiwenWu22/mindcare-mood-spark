@@ -41,42 +41,50 @@ export const moodOf = (key: MoodKey): Mood => MOODS.find((m) => m.key === key) ?
 export type TriggerKey =
   | "work"
   | "relationship"
-  | "sleep"
-  | "deadline"
-  | "alone"
+  | "family"
   | "health"
   | "money"
-  | "self";
+  | "future"
+  | "social"
+  | "weather"
+  | "alone"
+  | "other";
 
 export const TRIGGERS: { key: TriggerKey; label: string; keywords: string[] }[] = [
   {
     key: "work",
-    label: "学习 / 工作",
-    keywords: ["工作", "上班", "学习", "考试", "论文", "项目", "作业", "加班", "面试", "开会"],
+    label: "学业 / 工作",
+    keywords: ["工作", "上班", "学习", "考试", "论文", "项目", "作业", "加班", "面试", "开会", "ddl", "截止", "deadline"],
   },
   {
     key: "relationship",
     label: "人际关系",
-    keywords: ["朋友", "同事", "家人", "父母", "室友", "对象", "吵架", "沟通", "社交", "误会"],
+    keywords: ["朋友", "同事", "室友", "对象", "吵架", "沟通", "社交", "误会"],
   },
+  { key: "family", label: "家庭", keywords: ["家人", "父母", "妈妈", "爸爸", "家里"] },
   {
-    key: "sleep",
-    label: "睡眠不足",
-    keywords: ["失眠", "没睡", "熬夜", "困", "睡不着", "早起", "疲惫", "累"],
+    key: "health",
+    label: "健康",
+    keywords: ["生病", "感冒", "头疼", "胃", "身体", "失眠", "熬夜", "没睡", "睡不着", "疲惫"],
   },
-  {
-    key: "deadline",
-    label: "截止日期",
-    keywords: ["ddl", "截止", "deadline", "赶", "来不及", "时间不够", "交付"],
-  },
-  { key: "alone", label: "独处", keywords: ["一个人", "独处", "孤独", "没人", "安静"] },
-  { key: "health", label: "身体状态", keywords: ["生病", "感冒", "头疼", "胃", "身体", "运动"] },
-  { key: "money", label: "金钱压力", keywords: ["钱", "房租", "花销", "预算", "工资"] },
-  { key: "self", label: "自我要求", keywords: ["自责", "不够好", "后悔", "焦躁", "比较", "完美"] },
+  { key: "money", label: "经济", keywords: ["钱", "房租", "花销", "预算", "工资"] },
+  { key: "future", label: "未来规划", keywords: ["未来", "规划", "迷茫", "选择", "方向", "读研", "求职"] },
+  { key: "social", label: "社交媒体", keywords: ["刷手机", "朋友圈", "微博", "小红书", "短视频", "手机"] },
+  { key: "weather", label: "天气 / 环境", keywords: ["下雨", "阴天", "天气", "太热", "太冷", "环境"] },
+  { key: "alone", label: "独处时光", keywords: ["一个人", "独处", "孤独", "没人", "安静"] },
+  { key: "other", label: "其他", keywords: [] },
 ];
 
+/** 旧版本记录里出现过的标签，保持可读 */
+const LEGACY_TRIGGER_LABELS: Record<string, string> = {
+  sleep: "健康",
+  deadline: "学业 / 工作",
+  self: "其他",
+};
+
 export const triggerLabel = (key: string) =>
-  TRIGGERS.find((t) => t.key === key)?.label ?? key;
+  TRIGGERS.find((t) => t.key === key)?.label ?? LEGACY_TRIGGER_LABELS[key] ?? key;
+
 
 export type Entry = {
   id: string;
