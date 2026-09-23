@@ -86,18 +86,19 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
           </div>
 
           <div>
-            <label className="text-sm font-medium">发生了什么？</label>
+            <label className="text-sm font-medium">发生了什么？（选填）</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={4}
-              placeholder="发生了什么？写下此刻的感受……"
+              placeholder="发生了什么？写下此刻的感受……不写也没关系。"
               className="mt-3 w-full resize-none rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium">可能的触发因素（可选）</label>
+            <label className="text-sm font-medium">触发因素（可多选）</label>
+
             <div className="mt-3 flex flex-wrap gap-2">
               {TRIGGERS.map((t) => {
                 const active = triggers.includes(t.key);
