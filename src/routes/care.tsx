@@ -41,7 +41,7 @@ const NIGHT = [
 ];
 
 function CarePage() {
-  const [breathing, setBreathing] = useState(false);
+  const [breathing, setBreathing] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
 
   return (
@@ -56,17 +56,25 @@ function CarePage() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Wind className="h-4 w-4" /> 呼吸练习
           </div>
-          <h2 className="mt-3 font-display text-xl font-semibold">🧘 2 分钟慢呼吸</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            跟着圆圈的节奏：吸气 4 秒，停留 2 秒，呼气 6 秒。
-          </p>
-          <button
-            onClick={() => setBreathing(true)}
-            className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
-          >
-            开始练习
-          </button>
+          <h2 className="mt-3 font-display text-xl font-semibold">🧘 挑一个呼吸节奏</h2>
+          <ul className="mt-4 space-y-2">
+            {PLAN_KEYS.map((k) => {
+              const plan = BREATHING_PLANS[k]!;
+              return (
+                <li key={k}>
+                  <button
+                    onClick={() => setBreathing(k)}
+                    className="w-full rounded-2xl border border-border px-4 py-3 text-left transition-colors hover:bg-secondary"
+                  >
+                    <span className="block text-sm font-medium">{plan.title}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{plan.rhythm}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </section>
+
 
         <section className="card-soft px-6 py-6">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
