@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { Footprints, Moon, Music, Wind, X } from "lucide-react";
+import { useState } from "react";
+import { Footprints, Moon, Music, Wind } from "lucide-react";
 import { DailyPrompt } from "@/components/daily-prompt";
+import { BreathingSession } from "@/components/breathing-session";
+import { BREATHING_PLANS } from "@/lib/care-recs";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/care")({
   head: () => ({
@@ -16,70 +19,8 @@ export const Route = createFileRoute("/care")({
   component: CarePage,
 });
 
-const PHASES = [
-  { name: "吸气", seconds: 4, scale: 1 },
-  { name: "停留", seconds: 2, scale: 1 },
-  { name: "呼气", seconds: 6, scale: 0.62 },
-];
+const PLAN_KEYS = ["slow", "box", "relax478"] as const;
 
-function BreathingSession({ onClose }: { onClose: () => void }) {
-  const [phase, setPhase] = useState(0);
-  const [left, setLeft] = useState<number>(PHASES[0]!.seconds);
-  const [cycles, setCycles] = useState(0);
-  const phaseRef = useRef(0);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setLeft((prev) => {
-        if (prev > 1) return prev - 1;
-        const next = (phaseRef.current + 1) % PHASES.length;
-        phaseRef.current = next;
-        setPhase(next);
-        if (next === 0) setCycles((c) => c + 1);
-        return PHASES[next]!.seconds;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const current = PHASES[phase]!;
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 px-6 backdrop-blur-xl">
-      <button
-        onClick={onClose}
-        aria-label="结束练习"
-        className="absolute right-5 top-5 rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary"
-      >
-        <X className="h-5 w-5" />
-      </button>
-
-      <div className="flex h-64 w-64 items-center justify-center">
-        <div
-          className="flex h-64 w-64 items-center justify-center rounded-full bg-primary-soft"
-          style={{
-            transform: `scale(${current.scale})`,
-            transition: `transform ${current.seconds}s ease-in-out`,
-          }}
-        >
-          <div className="text-center">
-            <p className="font-display text-2xl font-semibold">{current.name}</p>
-            <p className="mt-1 text-4xl font-light tabular-nums">{left}</p>
-          </div>
-        </div>
-      </div>
-
-      <p className="mt-10 text-sm text-muted-foreground">吸气 4 秒 · 停留 2 秒 · 呼气 6 秒</p>
-      <p className="mt-2 text-sm text-muted-foreground">已完成 {cycles} 个循环</p>
-      <button
-        onClick={onClose}
-        className="mt-8 rounded-full border border-border px-6 py-2.5 text-sm transition-colors hover:bg-secondary"
-      >
-        结束练习
-      </button>
-    </div>
-  );
-}
 
 const MUSIC = [
   { title: "Calm Morning", desc: "清晨的环境音与轻缓和弦", minutes: 12, emoji: "🌤️" },
@@ -100,7 +41,7 @@ const NIGHT = [
 ];
 
 function CarePage() {
-  const [breathing, setBreathing] = useState(false);
+  const [breathing, setBreathing] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
 
   return (
@@ -115,17 +56,25 @@ function CarePage() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Wind className="h-4 w-4" /> 呼吸练习
           </div>
-          <h2 className="mt-3 font-display text-xl font-semibold">🧘 2 分钟慢呼吸</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            跟着圆圈的节奏：吸气 4 秒，停留 2 秒，呼气 6 秒。
-          </p>
-          <button
-            onClick={() => setBreathing(true)}
-            className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
-          >
-            开始练习
-          </button>
+          <h2 className="mt-3 font-display text-xl font-semibold">🧘 挑一个呼吸节奏</h2>
+          <ul className="mt-4 space-y-2">
+            {PLAN_KEYS.map((k) => {
+              const plan = BREATHING_PLANS[k]!;
+              return (
+                <li key={k}>
+                  <button
+                    onClick={() => setBreathing(k)}
+                    className="w-full rounded-2xl border border-border px-4 py-3 text-left transition-colors hover:bg-secondary"
+                  >
+                    <span className="block text-sm font-medium">{plan.title}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{plan.rhythm}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         </section>
+
 
         <section className="card-soft px-6 py-6">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -196,7 +145,10 @@ function CarePage() {
 
       <DailyPrompt />
 
-      {breathing && <BreathingSession onClose={() => setBreathing(false)} />}
+      {breathing && (
+        <BreathingSession plan={BREATHING_PLANS[breathing]!} onClose={() => setBreathing(null)} />
+      )}
+
     </div>
   );
 }

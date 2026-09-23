@@ -41,42 +41,50 @@ export const moodOf = (key: MoodKey): Mood => MOODS.find((m) => m.key === key) ?
 export type TriggerKey =
   | "work"
   | "relationship"
-  | "sleep"
-  | "deadline"
-  | "alone"
+  | "family"
   | "health"
   | "money"
-  | "self";
+  | "future"
+  | "social"
+  | "weather"
+  | "alone"
+  | "other";
 
 export const TRIGGERS: { key: TriggerKey; label: string; keywords: string[] }[] = [
   {
     key: "work",
-    label: "学习 / 工作",
-    keywords: ["工作", "上班", "学习", "考试", "论文", "项目", "作业", "加班", "面试", "开会"],
+    label: "学业 / 工作",
+    keywords: ["工作", "上班", "学习", "考试", "论文", "项目", "作业", "加班", "面试", "开会", "ddl", "截止", "deadline"],
   },
   {
     key: "relationship",
     label: "人际关系",
-    keywords: ["朋友", "同事", "家人", "父母", "室友", "对象", "吵架", "沟通", "社交", "误会"],
+    keywords: ["朋友", "同事", "室友", "对象", "吵架", "沟通", "社交", "误会"],
   },
+  { key: "family", label: "家庭", keywords: ["家人", "父母", "妈妈", "爸爸", "家里"] },
   {
-    key: "sleep",
-    label: "睡眠不足",
-    keywords: ["失眠", "没睡", "熬夜", "困", "睡不着", "早起", "疲惫", "累"],
+    key: "health",
+    label: "健康",
+    keywords: ["生病", "感冒", "头疼", "胃", "身体", "失眠", "熬夜", "没睡", "睡不着", "疲惫"],
   },
-  {
-    key: "deadline",
-    label: "截止日期",
-    keywords: ["ddl", "截止", "deadline", "赶", "来不及", "时间不够", "交付"],
-  },
-  { key: "alone", label: "独处", keywords: ["一个人", "独处", "孤独", "没人", "安静"] },
-  { key: "health", label: "身体状态", keywords: ["生病", "感冒", "头疼", "胃", "身体", "运动"] },
-  { key: "money", label: "金钱压力", keywords: ["钱", "房租", "花销", "预算", "工资"] },
-  { key: "self", label: "自我要求", keywords: ["自责", "不够好", "后悔", "焦躁", "比较", "完美"] },
+  { key: "money", label: "经济", keywords: ["钱", "房租", "花销", "预算", "工资"] },
+  { key: "future", label: "未来规划", keywords: ["未来", "规划", "迷茫", "选择", "方向", "读研", "求职"] },
+  { key: "social", label: "社交媒体", keywords: ["刷手机", "朋友圈", "微博", "小红书", "短视频", "手机"] },
+  { key: "weather", label: "天气 / 环境", keywords: ["下雨", "阴天", "天气", "太热", "太冷", "环境"] },
+  { key: "alone", label: "独处时光", keywords: ["一个人", "独处", "孤独", "没人", "安静"] },
+  { key: "other", label: "其他", keywords: [] },
 ];
 
+/** 旧版本记录里出现过的标签，保持可读 */
+const LEGACY_TRIGGER_LABELS: Record<string, string> = {
+  sleep: "健康",
+  deadline: "学业 / 工作",
+  self: "其他",
+};
+
 export const triggerLabel = (key: string) =>
-  TRIGGERS.find((t) => t.key === key)?.label ?? key;
+  TRIGGERS.find((t) => t.key === key)?.label ?? LEGACY_TRIGGER_LABELS[key] ?? key;
+
 
 export type Entry = {
   id: string;
@@ -121,7 +129,7 @@ export function seedEntries(): Entry[] {
       mood: "anxious",
       intensity: 8,
       note: "项目的 ddl 就在这周，任务堆在一起，晚上一直睡不着。",
-      triggers: ["work", "deadline", "sleep"],
+      triggers: ["work", "health"],
     },
     {
       id: "seed-3",
@@ -145,7 +153,7 @@ export function seedEntries(): Entry[] {
       mood: "sad",
       intensity: 5,
       note: "一个人待着的时候容易想太多，有点低落，但也没什么特别的事发生。",
-      triggers: ["alone", "self"],
+      triggers: ["alone", "future"],
     },
   ];
 }
@@ -278,6 +286,48 @@ export function triggerRanking(entries: Entry[]) {
     .sort((a, b) => b.count - a.count);
 }
 
+/** 每个触发因素下的情绪分布（用于堆叠条形图） */
+export function triggerMoodBreakdown(entries: Entry[], topN = 5) {
+  return triggerRanking(entries)
+    .slice(0, topN)
+    .map((t) => {
+      const related = entries.filter((e) => e.triggers.includes(t.key as TriggerKey));
+      const total = related.length || 1;
+      const counts = new Map<MoodKey, number>();
+      related.forEach((e) => counts.set(e.mood, (counts.get(e.mood) ?? 0) + 1));
+      const segments = [...counts.entries()]
+        .map(([key, count]) => ({
+          mood: moodOf(key),
+          count,
+          percent: Math.round((count / total) * 100),
+        }))
+        .sort((a, b) => b.count - a.count);
+      return { key: t.key, label: t.label, count: t.count, segments };
+    });
+}
+
+export const TIME_SLOTS = [
+  { key: "morning", label: "清晨", emoji: "🌅", from: 5, to: 11 },
+  { key: "afternoon", label: "午后", emoji: "☀️", from: 11, to: 17 },
+  { key: "evening", label: "傍晚", emoji: "🌇", from: 17, to: 23 },
+  { key: "night", label: "深夜", emoji: "🌙", from: 23, to: 5 },
+] as const;
+
+/** 各时间段的平均情绪强度 */
+export function timeOfDayStats(entries: Entry[]) {
+  return TIME_SLOTS.map((slot) => {
+    const inSlot = entries.filter((e) => {
+      const h = new Date(e.createdAt).getHours();
+      return slot.from < slot.to ? h >= slot.from && h < slot.to : h >= slot.from || h < slot.to;
+    });
+    const avg =
+      inSlot.length === 0
+        ? null
+        : Math.round((inSlot.reduce((s, e) => s + e.intensity, 0) / inSlot.length) * 10) / 10;
+    return { key: slot.key, label: slot.label, emoji: slot.emoji, count: inSlot.length, avg };
+  });
+}
+
 export function weekCount(entries: Entry[]) {
   const from = new Date();
   from.setDate(from.getDate() - 6);
@@ -331,13 +381,15 @@ export function analyzeEntries(entries: Entry[]): Insight {
 
   const suggestions: string[] = [];
   const has = (k: string) => triggers.some((t) => t.key === k);
-  if (has("deadline") || has("work"))
+  if (has("work"))
     suggestions.push("把大任务拆成 25 分钟能完成的小步骤，每完成一步给自己一次短暂休息。");
-  if (has("sleep")) suggestions.push("睡前 30 分钟把屏幕放远一点，用几次慢呼吸帮身体降速。");
-  if (has("relationship"))
+  if (has("health")) suggestions.push("睡前 30 分钟把屏幕放远一点，用几次慢呼吸帮身体降速。");
+  if (has("relationship") || has("family"))
     suggestions.push("不急着立刻回应，先把想说的写下来，明天再看一次会更清楚。");
   if (has("alone")) suggestions.push("独处时给自己一个轻的锚点：散步、听一首熟悉的歌或写三行字。");
-  if (has("self")) suggestions.push("试着把「我应该」换成「我可以」，今天只完成一件小事也算数。");
+  if (has("future")) suggestions.push("对未来的不确定，先只规划接下来一周能做的一件小事。");
+  if (has("social")) suggestions.push("给刷手机设一个温和的时间边界，比如睡前把手机放到房间另一头。");
+
   if (avgIntensity >= 7) suggestions.push("情绪强度较高时，先做 2 分钟呼吸练习，再决定下一步。");
   if (suggestions.length === 0)
     suggestions.push("保持现在的节奏，每天记录一次，就已经是很好的自我照顾。");

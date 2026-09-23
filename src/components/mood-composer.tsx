@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { Footprints, Music, Wind } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { MOODS, TRIGGERS, type MoodKey, type TriggerKey } from "@/lib/mood";
+import { recommendFor, type CareRecommendation } from "@/lib/care-recs";
+import { BreathingSession } from "@/components/breathing-session";
 import { useEntries } from "@/hooks/use-entries";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +14,8 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
   const [intensity, setIntensity] = useState(5);
   const [note, setNote] = useState("");
   const [triggers, setTriggers] = useState<TriggerKey[]>([]);
+  const [rec, setRec] = useState<CareRecommendation | null>(null);
+  const [breathing, setBreathing] = useState(false);
 
   const toggleTrigger = (key: TriggerKey) =>
     setTriggers((prev) => (prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]));
@@ -20,6 +26,7 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
       return;
     }
     addEntry({ mood, intensity, note, triggers });
+    setRec(recommendFor(mood, intensity));
     setMood(null);
     setIntensity(5);
     setNote("");
@@ -28,6 +35,7 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
       description: "可以到「情绪日记」里回顾它。",
     });
   };
+
 
   return (
     <section className="card-soft animate-rise px-6 py-7 sm:px-8">
@@ -78,18 +86,19 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
           </div>
 
           <div>
-            <label className="text-sm font-medium">发生了什么？</label>
+            <label className="text-sm font-medium">发生了什么？（选填）</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={4}
-              placeholder="发生了什么？写下此刻的感受……"
+              placeholder="发生了什么？写下此刻的感受……不写也没关系。"
               className="mt-3 w-full resize-none rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium">可能的触发因素（可选）</label>
+            <label className="text-sm font-medium">触发因素（可多选）</label>
+
             <div className="mt-3 flex flex-wrap gap-2">
               {TRIGGERS.map((t) => {
                 const active = triggers.includes(t.key);
@@ -119,6 +128,63 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
       >
         保存今天的情绪
       </button>
+
+      {rec && (
+        <div className="animate-rise mt-8 rounded-3xl border border-border bg-primary-soft/60 px-5 py-6 sm:px-6">
+          <h3 className="font-display text-lg font-semibold">为你推荐的几件小事</h3>
+          <p className="mt-1.5 text-sm text-muted-foreground">{rec.intro}</p>
+
+          <div className="mt-5 space-y-3">
+            <div className="rounded-2xl bg-card/85 px-4 py-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Wind className="h-4 w-4" /> 呼吸练习
+              </div>
+              <p className="mt-2 text-sm font-medium">{rec.breathing.title}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{rec.breathing.rhythm}</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                {rec.breathing.desc}
+              </p>
+              <button
+                onClick={() => setBreathing(true)}
+                className="mt-3 rounded-full bg-primary px-5 py-2 text-xs font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
+              >
+                开始呼吸练习
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-card/85 px-4 py-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Music className="h-4 w-4" /> 放松音乐
+              </div>
+              <p className="mt-2 text-sm font-medium">
+                {rec.music.emoji} {rec.music.title}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{rec.music.desc}</p>
+            </div>
+
+            <div className="rounded-2xl bg-card/85 px-4 py-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Footprints className="h-4 w-4" /> 轻运动
+              </div>
+              <p className="mt-2 text-sm font-medium">{rec.move.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{rec.move.desc}</p>
+            </div>
+          </div>
+
+          <p className="mt-4 text-xs leading-relaxed text-foreground/75">🌱 {rec.encouragement}</p>
+          <Link
+            to="/care"
+            className="mt-4 inline-flex text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            去自我关怀页看更多
+          </Link>
+        </div>
+      )}
+
+      {breathing && (
+        <BreathingSession plan={rec?.breathing} onClose={() => setBreathing(false)} />
+      )}
     </section>
+
   );
 }
