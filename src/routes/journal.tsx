@@ -3,8 +3,9 @@ import { useState } from "react";
 import { Download, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { MoodComposer } from "@/components/mood-composer";
+import { SampleNotice } from "@/components/sample-notice";
 import { useEntries } from "@/hooks/use-entries";
-import { downloadCsv, formatDate, moodOf, triggerLabel } from "@/lib/mood";
+import { downloadCsv, formatDate, isSample, moodOf, triggerLabel } from "@/lib/mood";
 
 export const Route = createFileRoute("/journal")({
   head: () => ({
@@ -58,6 +59,8 @@ function JournalPage() {
         </div>
       </header>
 
+      <SampleNotice />
+
       {composing && <MoodComposer title="记录一条新的感受" />}
 
       {ready && entries.length === 0 && (
@@ -86,12 +89,25 @@ function JournalPage() {
                       强度 {e.intensity}/10
                     </span>
                     <span className="text-xs text-muted-foreground">{formatDate(e.createdAt)}</span>
+                    {isSample(e) && (
+                      <span className="rounded-full border border-dashed border-primary/50 px-2 py-0.5 text-[11px] text-muted-foreground">
+                        示例
+                      </span>
+                    )}
                   </div>
                   {e.note && (
                     <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
                       {e.note}
                     </p>
                   )}
+                  {(e.followUps ?? []).map((f) => (
+                    <p key={f.at} className="mt-3 text-xs text-muted-foreground">
+                      🫁 {f.label}后：
+                      <span className="font-medium text-foreground/80">
+                        {f.before} → {f.after}
+                      </span>
+                    </p>
+                  ))}
                   {e.triggers.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {e.triggers.map((t) => (

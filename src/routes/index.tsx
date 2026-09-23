@@ -2,8 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { MoodComposer } from "@/components/mood-composer";
 import { DailyPrompt } from "@/components/daily-prompt";
+import { SampleNotice } from "@/components/sample-notice";
 import { useEntries } from "@/hooks/use-entries";
-import { formatDate, moodOf, weekCount } from "@/lib/mood";
+import { formatDate, isSample, moodOf, weekCount } from "@/lib/mood";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,16 +23,18 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { entries, ready } = useEntries();
+  // 顶部统计只看用户自己的记录，示例数据不应该冒充"你今天的情绪"
+  const own = entries.filter((e) => !isSample(e));
   const today = new Date().toDateString();
-  const todayEntry = entries.find((e) => new Date(e.createdAt).toDateString() === today);
-  const latest = entries[0];
+  const todayEntry = own.find((e) => new Date(e.createdAt).toDateString() === today);
+  const latest = own[0];
 
   const stats = [
     {
       label: "今日情绪",
       value: todayEntry ? `${moodOf(todayEntry.mood).emoji} ${moodOf(todayEntry.mood).label}` : "还没记录",
     },
-    { label: "本周记录", value: ready ? `${weekCount(entries)} 次` : "—" },
+    { label: "本周记录", value: ready ? `${weekCount(own)} 次` : "—" },
     { label: "最近一次", value: latest ? formatDate(latest.createdAt) : "—" },
   ];
 
@@ -41,6 +44,8 @@ function Index() {
         <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">MindCare</h1>
         <p className="mt-3 text-base text-muted-foreground sm:text-lg">今天，也给自己一点空间。</p>
       </section>
+
+      <SampleNotice />
 
       <section className="grid gap-3 sm:grid-cols-3">
         {stats.map((s) => (

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { Sparkles } from "lucide-react";
 import { useEntries } from "@/hooks/use-entries";
+import { SampleNotice } from "@/components/sample-notice";
 import {
   analyzeEntries,
   entryScore,
@@ -125,6 +126,8 @@ function InsightsPage() {
           这些只是从你的记录里看到的一些线索，不是诊断。
         </p>
       </header>
+
+      <SampleNotice />
 
       <section className="card-soft px-6 py-6 sm:px-8">
         <h2 className="font-display text-lg font-semibold">最近 7 天情绪趋势</h2>

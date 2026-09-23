@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, NotebookPen, Sparkles, HeartHandshake } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { AmbientMiniPlayer } from "@/components/ambient-mini-player";
 
 const NAV = [
   { to: "/", label: "首页", icon: Home },
@@ -62,6 +63,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         </p>
 
       </footer>
+
+      <AmbientMiniPlayer />
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/90 backdrop-blur-xl md:hidden">
         <div className="mx-auto flex max-w-md items-stretch justify-between px-2 py-1.5">

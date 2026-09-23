@@ -1,3 +1,5 @@
+import { hasCrisisSignal, HOTLINE } from "@/lib/safety";
+
 /**
  * MindCare 核心数据层
  * - 情绪定义、触发因素定义
@@ -86,6 +88,16 @@ export const triggerLabel = (key: string) =>
   TRIGGERS.find((t) => t.key === key)?.label ?? LEGACY_TRIGGER_LABELS[key] ?? key;
 
 
+/** 一次自助调节前后的强度变化，用来验证"什么对我有效" */
+export type FollowUp = {
+  method: "breathing";
+  /** 具体做了什么，例如"箱式呼吸 4-4-4-4" */
+  label: string;
+  before: number;
+  after: number;
+  at: string;
+};
+
 export type Entry = {
   id: string;
   /** ISO 时间戳 */
@@ -94,7 +106,28 @@ export type Entry = {
   intensity: number; // 1-10
   note: string;
   triggers: TriggerKey[];
+  /** 示例数据：首次打开时自动填入，界面上会明确标注 */
+  sample?: boolean;
+  followUps?: FollowUp[];
 };
+
+/** 旧版本的示例数据没有 sample 字段，用 id 前缀兜底识别 */
+export const isSample = (e: Entry) => e.sample === true || e.id.startsWith("seed-");
+
+const LEGACY_TRIGGER_KEYS: Record<string, TriggerKey> = {
+  sleep: "health",
+  deadline: "work",
+  self: "other",
+};
+
+/** 把旧版本的触发因素 key 归一到现在的 key，并去重，避免同一标签出现两行 */
+function normalizeTriggers(triggers: string[]): TriggerKey[] {
+  const valid = new Set<string>(TRIGGERS.map((t) => t.key));
+  const out = triggers
+    .map((t) => LEGACY_TRIGGER_KEYS[t] ?? t)
+    .filter((t): t is TriggerKey => valid.has(t));
+  return Array.from(new Set(out));
+}
 
 const STORAGE_KEY = "mindcare.entries.v1";
 
@@ -117,6 +150,7 @@ export function seedEntries(): Entry[] {
   return [
     {
       id: "seed-1",
+      sample: true,
       createdAt: daysAgo(0, 9),
       mood: "calm",
       intensity: 6,
@@ -125,22 +159,31 @@ export function seedEntries(): Entry[] {
     },
     {
       id: "seed-2",
+      sample: true,
       createdAt: daysAgo(1, 22),
       mood: "anxious",
       intensity: 8,
       note: "项目的 ddl 就在这周，任务堆在一起，晚上一直睡不着。",
       triggers: ["work", "health"],
+      followUps: [
+        { method: "breathing", label: "箱式呼吸 4-4-4-4", before: 8, after: 5, at: daysAgo(1, 22) },
+      ],
     },
     {
       id: "seed-3",
+      sample: true,
       createdAt: daysAgo(2, 20),
       mood: "stressed",
       intensity: 7,
       note: "开了一整天的会，回家什么都不想做，只想躺着。",
       triggers: ["work"],
+      followUps: [
+        { method: "breathing", label: "箱式呼吸 4-4-4-4", before: 7, after: 5, at: daysAgo(2, 20) },
+      ],
     },
     {
       id: "seed-4",
+      sample: true,
       createdAt: daysAgo(4, 19),
       mood: "happy",
       intensity: 7,
@@ -149,6 +192,7 @@ export function seedEntries(): Entry[] {
     },
     {
       id: "seed-5",
+      sample: true,
       createdAt: daysAgo(5, 23),
       mood: "sad",
       intensity: 5,
@@ -168,7 +212,8 @@ export function loadEntries(): Entry[] {
       return seeded;
     }
     const parsed = JSON.parse(raw) as Entry[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((e) => ({ ...e, triggers: normalizeTriggers(e.triggers ?? []) }));
   } catch {
     return [];
   }
@@ -188,7 +233,7 @@ const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
 
 /** 把记录转成带 BOM 的 CSV 文本（Excel 打开中文不乱码） */
 export function entriesToCsv(entries: Entry[]): string {
-  const header = ["记录时间", "情绪", "强度（1-10）", "心情笔记", "触发因素"];
+  const header = ["记录时间", "情绪", "强度（1-10）", "心情笔记", "触发因素", "调节记录", "备注"];
   const rows = sortByNewest(entries).map((e) => {
     const mood = moodOf(e.mood);
     const when = new Date(e.createdAt);
@@ -200,6 +245,8 @@ export function entriesToCsv(entries: Entry[]): string {
       String(e.intensity),
       e.note,
       e.triggers.map(triggerLabel).join("、"),
+      (e.followUps ?? []).map((f) => `${f.label}后 ${f.before}→${f.after}`).join("；"),
+      isSample(e) ? "示例数据" : "",
     ];
   });
   const lines = [header, ...rows].map((row) => row.map(csvCell).join(","));
@@ -380,6 +427,11 @@ export function analyzeEntries(entries: Entry[]): Insight {
   }
 
   const suggestions: string[] = [];
+  if (recent.some((e) => hasCrisisSignal(e.note))) {
+    suggestions.push(
+      `最近的记录里有很沉重的内容。如果有伤害自己的念头，请联系信任的人，或拨打${HOTLINE.name} ${HOTLINE.number}，你不必一个人扛着。`,
+    );
+  }
   const has = (k: string) => triggers.some((t) => t.key === k);
   if (has("work"))
     suggestions.push("把大任务拆成 25 分钟能完成的小步骤，每完成一步给自己一次短暂休息。");
@@ -407,7 +459,7 @@ export const DAILY_PROMPTS = [
   "你不需要把所有事情都做好，今天完成一点点，也已经足够。",
   "情绪没有对错，它只是在告诉你，有些事需要被看见。",
   "允许自己慢下来，休息不是偷懒，是继续走下去的方式。",
-  "你已经比昨天多撑过了一天，这本身就值得被肯定。",
+  "今天愿意停下来看看自己的感受，也是在照顾自己。",
   "不必急着变好，先让自己被理解，就是一种进展。",
   "今天如果只做成一件小事，那就让它是好好吃一顿饭。",
   "把「我应该」换成「我可以」，你会轻松一点。",

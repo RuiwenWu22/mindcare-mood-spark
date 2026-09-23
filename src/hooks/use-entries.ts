@@ -3,7 +3,9 @@ import {
   loadEntries,
   saveEntries,
   sortByNewest,
+  isSample,
   type Entry,
+  type FollowUp,
   type MoodKey,
   type TriggerKey,
   detectTriggers,
@@ -57,5 +59,21 @@ export function useEntries() {
     [commit],
   );
 
-  return { entries, ready, addEntry, removeEntry };
+  /** 清空示例数据，只保留用户自己的记录（之后不会再自动填入示例） */
+  const clearSamples = useCallback(
+    () => commit(loadEntries().filter((e) => !isSample(e))),
+    [commit],
+  );
+
+  const addFollowUp = useCallback(
+    (id: string, followUp: FollowUp) =>
+      commit(
+        loadEntries().map((e) =>
+          e.id === id ? { ...e, followUps: [...(e.followUps ?? []), followUp] } : e,
+        ),
+      ),
+    [commit],
+  );
+
+  return { entries, ready, addEntry, removeEntry, clearSamples, addFollowUp };
 }

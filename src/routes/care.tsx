@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Footprints, Moon, Music, Wind } from "lucide-react";
+import { Footprints, Moon, Music, Pause, Play, Wind } from "lucide-react";
 import { DailyPrompt } from "@/components/daily-prompt";
 import { BreathingSession } from "@/components/breathing-session";
 import { BREATHING_PLANS } from "@/lib/care-recs";
+import { AMBIENT_ORDER, AMBIENT_TRACKS, toggleAmbient } from "@/lib/ambient";
+import { useAmbient } from "@/hooks/use-ambient";
 import { toast } from "sonner";
 
 
@@ -22,11 +24,6 @@ export const Route = createFileRoute("/care")({
 const PLAN_KEYS = ["slow", "box", "relax478"] as const;
 
 
-const MUSIC = [
-  { title: "Calm Morning", desc: "清晨的环境音与轻缓和弦", minutes: 12, emoji: "🌤️" },
-  { title: "Soft Piano", desc: "缓慢的钢琴独奏，适合专注或休息", minutes: 18, emoji: "🎹" },
-  { title: "Rainy Evening", desc: "雨声与低频背景，帮助入睡", minutes: 25, emoji: "🌧️" },
-];
 
 const MOVES = [
   { title: "散步 10 分钟", desc: "不带目的地，走的时候留意呼吸和脚步。" },
@@ -42,7 +39,7 @@ const NIGHT = [
 
 function CarePage() {
   const [breathing, setBreathing] = useState<string | null>(null);
-  const [playing, setPlaying] = useState<string | null>(null);
+  const { playing } = useAmbient();
 
   return (
     <div className="space-y-6">
@@ -81,16 +78,21 @@ function CarePage() {
             <Music className="h-4 w-4" /> 放松音乐
           </div>
           <h2 className="mt-3 font-display text-xl font-semibold">🎵 挑一段背景声</h2>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            声音由浏览器实时生成，无需下载，到时间会自动淡出。
+          </p>
           <ul className="mt-4 space-y-2">
-            {MUSIC.map((m) => {
-              const active = playing === m.title;
+            {AMBIENT_ORDER.map((id) => {
+              const m = AMBIENT_TRACKS[id];
+              const active = playing === id;
               return (
-                <li key={m.title}>
+                <li key={id}>
                   <button
                     onClick={() => {
-                      setPlaying(active ? null : m.title);
-                      if (!active) toast(`正在播放《${m.title}》的氛围推荐 🎧`);
+                      const started = toggleAmbient(id);
+                      if (!started && !active) toast("当前浏览器暂不支持播放背景声");
                     }}
+                    aria-pressed={active}
                     className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
                       active ? "border-transparent bg-accent-soft" : "border-border hover:bg-secondary"
                     }`}
@@ -100,8 +102,16 @@ function CarePage() {
                       <span className="block text-sm font-medium">{m.title}</span>
                       <span className="block truncate text-xs text-muted-foreground">{m.desc}</span>
                     </span>
-                    <span className="text-xs text-muted-foreground">
-                      {active ? "播放中" : `${m.minutes} 分钟`}
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                      {active ? (
+                        <>
+                          <Pause className="h-3.5 w-3.5" /> 播放中
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-3.5 w-3.5" /> {m.minutes} 分钟
+                        </>
+                      )}
                     </span>
                   </button>
                 </li>
