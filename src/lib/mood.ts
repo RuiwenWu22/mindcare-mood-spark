@@ -286,6 +286,48 @@ export function triggerRanking(entries: Entry[]) {
     .sort((a, b) => b.count - a.count);
 }
 
+/** 每个触发因素下的情绪分布（用于堆叠条形图） */
+export function triggerMoodBreakdown(entries: Entry[], topN = 5) {
+  return triggerRanking(entries)
+    .slice(0, topN)
+    .map((t) => {
+      const related = entries.filter((e) => e.triggers.includes(t.key as TriggerKey));
+      const total = related.length || 1;
+      const counts = new Map<MoodKey, number>();
+      related.forEach((e) => counts.set(e.mood, (counts.get(e.mood) ?? 0) + 1));
+      const segments = [...counts.entries()]
+        .map(([key, count]) => ({
+          mood: moodOf(key),
+          count,
+          percent: Math.round((count / total) * 100),
+        }))
+        .sort((a, b) => b.count - a.count);
+      return { key: t.key, label: t.label, count: t.count, segments };
+    });
+}
+
+export const TIME_SLOTS = [
+  { key: "morning", label: "清晨", emoji: "🌅", from: 5, to: 11 },
+  { key: "afternoon", label: "午后", emoji: "☀️", from: 11, to: 17 },
+  { key: "evening", label: "傍晚", emoji: "🌇", from: 17, to: 23 },
+  { key: "night", label: "深夜", emoji: "🌙", from: 23, to: 5 },
+] as const;
+
+/** 各时间段的平均情绪强度 */
+export function timeOfDayStats(entries: Entry[]) {
+  return TIME_SLOTS.map((slot) => {
+    const inSlot = entries.filter((e) => {
+      const h = new Date(e.createdAt).getHours();
+      return slot.from < slot.to ? h >= slot.from && h < slot.to : h >= slot.from || h < slot.to;
+    });
+    const avg =
+      inSlot.length === 0
+        ? null
+        : Math.round((inSlot.reduce((s, e) => s + e.intensity, 0) / inSlot.length) * 10) / 10;
+    return { key: slot.key, label: slot.label, emoji: slot.emoji, count: inSlot.length, avg };
+  });
+}
+
 export function weekCount(entries: Entry[]) {
   const from = new Date();
   from.setDate(from.getDate() - 6);
@@ -339,13 +381,15 @@ export function analyzeEntries(entries: Entry[]): Insight {
 
   const suggestions: string[] = [];
   const has = (k: string) => triggers.some((t) => t.key === k);
-  if (has("deadline") || has("work"))
+  if (has("work"))
     suggestions.push("把大任务拆成 25 分钟能完成的小步骤，每完成一步给自己一次短暂休息。");
-  if (has("sleep")) suggestions.push("睡前 30 分钟把屏幕放远一点，用几次慢呼吸帮身体降速。");
-  if (has("relationship"))
+  if (has("health")) suggestions.push("睡前 30 分钟把屏幕放远一点，用几次慢呼吸帮身体降速。");
+  if (has("relationship") || has("family"))
     suggestions.push("不急着立刻回应，先把想说的写下来，明天再看一次会更清楚。");
   if (has("alone")) suggestions.push("独处时给自己一个轻的锚点：散步、听一首熟悉的歌或写三行字。");
-  if (has("self")) suggestions.push("试着把「我应该」换成「我可以」，今天只完成一件小事也算数。");
+  if (has("future")) suggestions.push("对未来的不确定，先只规划接下来一周能做的一件小事。");
+  if (has("social")) suggestions.push("给刷手机设一个温和的时间边界，比如睡前把手机放到房间另一头。");
+
   if (avgIntensity >= 7) suggestions.push("情绪强度较高时，先做 2 分钟呼吸练习，再决定下一步。");
   if (suggestions.length === 0)
     suggestions.push("保持现在的节奏，每天记录一次，就已经是很好的自我照顾。");
