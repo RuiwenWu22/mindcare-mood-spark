@@ -88,6 +88,34 @@ export const triggerLabel = (key: string) =>
   TRIGGERS.find((t) => t.key === key)?.label ?? LEGACY_TRIGGER_LABELS[key] ?? key;
 
 
+/* ---------------- 场景：此刻在做什么 ---------------- */
+/** 灵感来自微信状态：年轻人描述自己时，常说的是"在做什么"，而不只是"感觉如何" */
+export type ActivityKey =
+  | "work"
+  | "study"
+  | "commute"
+  | "social"
+  | "scroll"
+  | "exercise"
+  | "eat"
+  | "rest"
+  | "bed";
+
+export const ACTIVITIES: { key: ActivityKey; label: string; emoji: string }[] = [
+  { key: "work", label: "搬砖", emoji: "💼" },
+  { key: "study", label: "学习", emoji: "📚" },
+  { key: "commute", label: "通勤", emoji: "🚇" },
+  { key: "social", label: "和人相处", emoji: "💬" },
+  { key: "scroll", label: "刷手机", emoji: "📱" },
+  { key: "exercise", label: "运动", emoji: "🏃" },
+  { key: "eat", label: "干饭", emoji: "🍚" },
+  { key: "rest", label: "宅着", emoji: "🛋️" },
+  { key: "bed", label: "睡前", emoji: "🌙" },
+];
+
+const ACTIVITY_KEYS = new Set<string>(ACTIVITIES.map((a) => a.key));
+export const activityOf = (key: ActivityKey) => ACTIVITIES.find((a) => a.key === key)!;
+
 /** 一次自助调节前后的强度变化，用来验证"什么对我有效" */
 export type FollowUp = {
   method: "breathing";
@@ -106,6 +134,8 @@ export type Entry = {
   intensity: number; // 1-10
   note: string;
   triggers: TriggerKey[];
+  /** 记录时在做什么（可选） */
+  activity?: ActivityKey;
   /** 示例数据：首次打开时自动填入，界面上会明确标注 */
   sample?: boolean;
   followUps?: FollowUp[];
@@ -147,6 +177,13 @@ const daysAgo = (n: number, hour = 21) => {
 };
 
 export function seedEntries(): Entry[] {
+  const breath = (label: string, before: number, after: number, at: string) => ({
+    method: "breathing" as const,
+    label,
+    before,
+    after,
+    at,
+  });
   return [
     {
       id: "seed-1",
@@ -156,6 +193,7 @@ export function seedEntries(): Entry[] {
       intensity: 6,
       note: "早上提前二十分钟出门，路上慢慢走了一段，心里比平时安静一些。",
       triggers: ["alone"],
+      activity: "commute",
     },
     {
       id: "seed-2",
@@ -165,9 +203,8 @@ export function seedEntries(): Entry[] {
       intensity: 8,
       note: "项目的 ddl 就在这周，任务堆在一起，晚上一直睡不着。",
       triggers: ["work", "health"],
-      followUps: [
-        { method: "breathing", label: "箱式呼吸 4-4-4-4", before: 8, after: 5, at: daysAgo(1, 22) },
-      ],
+      activity: "bed",
+      followUps: [breath("箱式呼吸 4-4-4-4", 8, 5, daysAgo(1, 22))],
     },
     {
       id: "seed-3",
@@ -177,9 +214,28 @@ export function seedEntries(): Entry[] {
       intensity: 7,
       note: "开了一整天的会，回家什么都不想做，只想躺着。",
       triggers: ["work"],
-      followUps: [
-        { method: "breathing", label: "箱式呼吸 4-4-4-4", before: 7, after: 5, at: daysAgo(2, 20) },
-      ],
+      activity: "rest",
+      followUps: [breath("箱式呼吸 4-4-4-4", 7, 5, daysAgo(2, 20))],
+    },
+    {
+      id: "seed-6",
+      sample: true,
+      createdAt: daysAgo(3, 19),
+      mood: "happy",
+      intensity: 7,
+      note: "下班去跑了 3 公里，出了一身汗，脑子清爽了很多。",
+      triggers: ["health"],
+      activity: "exercise",
+    },
+    {
+      id: "seed-7",
+      sample: true,
+      createdAt: daysAgo(3, 23),
+      mood: "irritated",
+      intensity: 6,
+      note: "睡前刷了一个小时短视频，越刷越烦，也更睡不着了。",
+      triggers: ["social"],
+      activity: "scroll",
     },
     {
       id: "seed-4",
@@ -189,6 +245,7 @@ export function seedEntries(): Entry[] {
       intensity: 7,
       note: "和朋友吃了顿饭，聊了很久，久违地笑了很多次。",
       triggers: ["relationship"],
+      activity: "social",
     },
     {
       id: "seed-5",
@@ -198,6 +255,18 @@ export function seedEntries(): Entry[] {
       intensity: 5,
       note: "一个人待着的时候容易想太多，有点低落，但也没什么特别的事发生。",
       triggers: ["alone", "future"],
+      activity: "bed",
+    },
+    {
+      id: "seed-8",
+      sample: true,
+      createdAt: daysAgo(6, 15),
+      mood: "anxious",
+      intensity: 6,
+      note: "写报告卡住了，越想越着急，总觉得自己做得不够好。",
+      triggers: ["work"],
+      activity: "work",
+      followUps: [breath("4-7-8 放松呼吸", 6, 5, daysAgo(6, 15))],
     },
   ];
 }
@@ -213,7 +282,12 @@ export function loadEntries(): Entry[] {
     }
     const parsed = JSON.parse(raw) as Entry[];
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((e) => ({ ...e, triggers: normalizeTriggers(e.triggers ?? []) }));
+    return parsed.map((e) => {
+      const { activity, ...rest } = e;
+      const clean: Entry = { ...rest, triggers: normalizeTriggers(e.triggers ?? []) };
+      if (activity && ACTIVITY_KEYS.has(activity)) clean.activity = activity;
+      return clean;
+    });
   } catch {
     return [];
   }
@@ -233,7 +307,16 @@ const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
 
 /** 把记录转成带 BOM 的 CSV 文本（Excel 打开中文不乱码） */
 export function entriesToCsv(entries: Entry[]): string {
-  const header = ["记录时间", "情绪", "强度（1-10）", "心情笔记", "触发因素", "调节记录", "备注"];
+  const header = [
+    "记录时间",
+    "情绪",
+    "强度（1-10）",
+    "心情笔记",
+    "触发因素",
+    "在做什么",
+    "调节记录",
+    "备注",
+  ];
   const rows = sortByNewest(entries).map((e) => {
     const mood = moodOf(e.mood);
     const when = new Date(e.createdAt);
@@ -245,6 +328,7 @@ export function entriesToCsv(entries: Entry[]): string {
       String(e.intensity),
       e.note,
       e.triggers.map(triggerLabel).join("、"),
+      e.activity ? activityOf(e.activity).label : "",
       (e.followUps ?? []).map((f) => `${f.label}后 ${f.before}→${f.after}`).join("；"),
       isSample(e) ? "示例数据" : "",
     ];
@@ -384,11 +468,88 @@ export function weekCount(entries: Entry[]) {
 
 /* ---------------- 规则版"AI 分析" ---------------- */
 
-export type Insight = { headline: string; body: string; suggestions: string[] };
+/** 负向情绪下，每种调节方法前后的强度变化。正向情绪的强度下降不代表"变好"，不计入 */
+export type MethodStat = {
+  label: string;
+  count: number;
+  avgBefore: number;
+  avgAfter: number;
+  avgDrop: number;
+  /** 全部来自示例数据 */
+  sampleOnly: boolean;
+};
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+export function whatWorks(entries: Entry[]): MethodStat[] {
+  const acc = new Map<string, { count: number; before: number; after: number; own: number }>();
+  for (const e of entries) {
+    if (moodOf(e.mood).valence >= 0) continue;
+    for (const f of e.followUps ?? []) {
+      const a = acc.get(f.label) ?? { count: 0, before: 0, after: 0, own: 0 };
+      a.count += 1;
+      a.before += f.before;
+      a.after += f.after;
+      if (!isSample(e)) a.own += 1;
+      acc.set(f.label, a);
+    }
+  }
+  return [...acc.entries()]
+    .map(([label, a]) => ({
+      label,
+      count: a.count,
+      avgBefore: round1(a.before / a.count),
+      avgAfter: round1(a.after / a.count),
+      avgDrop: round1((a.before - a.after) / a.count),
+      sampleOnly: a.own === 0,
+    }))
+    .sort((x, y) => y.avgDrop - x.avgDrop || y.count - x.count);
+}
+
+export type ActivityStat = {
+  key: ActivityKey;
+  label: string;
+  emoji: string;
+  count: number;
+  bright: number;
+  neutral: number;
+  heavy: number;
+};
+
+/** 不同场景下的情绪构成：舒展（正向）/ 一般 / 偏消耗（负向） */
+export function activityStats(entries: Entry[]): ActivityStat[] {
+  return ACTIVITIES.map((a) => {
+    const list = entries.filter((e) => e.activity === a.key);
+    const v = list.map((e) => moodOf(e.mood).valence);
+    return {
+      key: a.key,
+      label: a.label,
+      emoji: a.emoji,
+      count: list.length,
+      bright: v.filter((x) => x === 1).length,
+      neutral: v.filter((x) => x === 0).length,
+      heavy: v.filter((x) => x === -1).length,
+    };
+  })
+    .filter((s) => s.count > 0)
+    .sort((a, b) => b.count - a.count);
+}
+
+/* ---------------- 规则版分析（每条结论都附依据） ---------------- */
+
+export type Insight = {
+  headline: string;
+  body: string;
+  suggestions: string[];
+  /** "为什么这样说"：得出上面结论所依据的统计 */
+  evidence: string[];
+};
+
+const slotRange = (from: number, to: number) => `${from}–${to} 点`;
 
 /**
- * 纯前端规则生成的温和分析。
- * 之后接入 OpenAI 时，只需把这个函数换成 async 的服务端调用，返回同样的 Insight 结构。
+ * 纯前端规则生成的温和分析，每一句结论都能在 evidence 里找到对应的统计。
+ * 之后接入大模型时，只需把这个函数换成服务端调用，返回同样的 Insight 结构。
  */
 export function analyzeEntries(entries: Entry[]): Insight {
   if (entries.length === 0) {
@@ -396,28 +557,34 @@ export function analyzeEntries(entries: Entry[]): Insight {
       headline: "还没有足够的记录",
       body: "写下第一条情绪记录后，这里会根据你的记录，慢慢总结出一些温和的观察。",
       suggestions: ["先从今天的一句话开始，不需要写得完整。"],
+      evidence: [],
     };
   }
 
   const recent = sortByNewest(entries).slice(0, 10);
+  const n = recent.length;
   const dist = moodDistribution(recent);
   const top = dist[0]!;
   const triggers = triggerRanking(recent);
   const topTrigger = triggers[0];
-  const avgIntensity =
-    Math.round((recent.reduce((s, e) => s + e.intensity, 0) / recent.length) * 10) / 10;
-  const negative = recent.filter((e) => moodOf(e.mood).valence === -1).length;
-  const negRatio = negative / recent.length;
+  const avgIntensity = round1(recent.reduce((s, e) => s + e.intensity, 0) / n);
+  const heavyEntries = recent.filter((e) => moodOf(e.mood).valence === -1);
+  const negRatio = heavyEntries.length / n;
 
   const parts: string[] = [];
+  const evidence: string[] = [
+    `最近 ${n} 条记录里，「${top.mood.label}」出现 ${top.count} 次（${top.percent}%），平均强度 ${avgIntensity} / 10。`,
+  ];
   parts.push(
-    `从你最近的 ${recent.length} 条记录来看，出现最多的是「${top.mood.label}」，大约占 ${top.percent}%，平均情绪强度在 ${avgIntensity} 左右。`,
+    `从你最近的 ${n} 条记录来看，出现最多的是「${top.mood.label}」，平均情绪强度在 ${avgIntensity} 左右。`,
   );
   if (topTrigger) {
     parts.push(
       `这些情绪似乎更常出现在与「${topTrigger.label}」相关的时刻，它可能是近期影响你状态的一个因素。`,
     );
+    evidence.push(`「${topTrigger.label}」是出现最多的触发标签，共 ${topTrigger.count} 次。`);
   }
+  evidence.push(`偏消耗的情绪（焦虑、难过、烦躁、压力很大）占 ${heavyEntries.length} / ${n} 条。`);
   if (negRatio >= 0.6) {
     parts.push("最近偏消耗的感受出现得比较密集，这通常说明你在同时扛着不少事情，而不是你不够好。");
   } else if (negRatio <= 0.25) {
@@ -426,12 +593,56 @@ export function analyzeEntries(entries: Entry[]): Insight {
     parts.push("你的情绪起伏看起来在正常范围内，有累的时候，也有缓过来的时候。");
   }
 
+  // 时段规律：偏消耗的记录集中在哪个时段
+  if (heavyEntries.length >= 2) {
+    const bySlot = TIME_SLOTS.map((slot) => ({
+      slot,
+      count: heavyEntries.filter((e) => {
+        const h = new Date(e.createdAt).getHours();
+        return slot.from < slot.to ? h >= slot.from && h < slot.to : h >= slot.from || h < slot.to;
+      }).length,
+    })).sort((a, b) => b.count - a.count);
+    const peak = bySlot[0]!;
+    if (peak.count >= 2 && peak.count / heavyEntries.length >= 0.5) {
+      parts.push(`偏消耗的感受更常出现在「${peak.slot.label}」。`);
+      evidence.push(
+        `${heavyEntries.length} 条偏消耗的记录里，有 ${peak.count} 条在${peak.slot.label}（${slotRange(peak.slot.from, peak.slot.to)}）。`,
+      );
+    }
+  }
+
+  // 场景规律：在做什么的时候更轻松 / 更消耗
+  const scenes = activityStats(recent).filter((s) => s.count >= 2);
+  const heavyScene = scenes.find((s) => s.heavy / s.count >= 0.6);
+  const brightScene = scenes.find((s) => s.bright / s.count >= 0.6);
+  if (heavyScene) {
+    parts.push(`「${heavyScene.label}」的时候，偏消耗的感受占了多数。`);
+    evidence.push(`场景为「${heavyScene.label}」的 ${heavyScene.count} 条记录里，${heavyScene.heavy} 条偏消耗。`);
+  }
+  if (brightScene) {
+    parts.push(`「${brightScene.label}」时的记录大多是舒展的，值得多留意。`);
+    evidence.push(`场景为「${brightScene.label}」的 ${brightScene.count} 条记录里，${brightScene.bright} 条是舒展的。`);
+  }
+
+  const samples = recent.filter(isSample).length;
+  if (samples > 0) evidence.push(`其中 ${samples} 条是示例记录。`);
+
   const suggestions: string[] = [];
   if (recent.some((e) => hasCrisisSignal(e.note))) {
     suggestions.push(
       `最近的记录里有很沉重的内容。如果有伤害自己的念头，请联系信任的人，或拨打${HOTLINE.name} ${HOTLINE.number}，你不必一个人扛着。`,
     );
   }
+  const best = whatWorks(entries).find((m) => m.avgDrop >= 1);
+  if (best) {
+    suggestions.push(
+      `下次感到紧绷或低落时，可以先试试「${best.label}」：${best.sampleOnly ? "在示例记录里" : "在你的记录里"}，它平均让强度下降 ${best.avgDrop}。`,
+    );
+  }
+  if (heavyScene?.key === "bed")
+    suggestions.push("睡前容易想太多时，可以试试 4-7-8 呼吸，或者先把脑子里的事写下来再睡。");
+  if (heavyScene?.key === "scroll")
+    suggestions.push("给刷手机设一个温和的边界，比如睡前把手机放到房间另一头。");
   const has = (k: string) => triggers.some((t) => t.key === k);
   if (has("work"))
     suggestions.push("把大任务拆成 25 分钟能完成的小步骤，每完成一步给自己一次短暂休息。");
@@ -440,8 +651,7 @@ export function analyzeEntries(entries: Entry[]): Insight {
     suggestions.push("不急着立刻回应，先把想说的写下来，明天再看一次会更清楚。");
   if (has("alone")) suggestions.push("独处时给自己一个轻的锚点：散步、听一首熟悉的歌或写三行字。");
   if (has("future")) suggestions.push("对未来的不确定，先只规划接下来一周能做的一件小事。");
-  if (has("social")) suggestions.push("给刷手机设一个温和的时间边界，比如睡前把手机放到房间另一头。");
-
+  if (has("social")) suggestions.push("给刷手机设一个温和的边界，比如睡前把手机放到房间另一头。");
   if (avgIntensity >= 7) suggestions.push("情绪强度较高时，先做 2 分钟呼吸练习，再决定下一步。");
   if (suggestions.length === 0)
     suggestions.push("保持现在的节奏，每天记录一次，就已经是很好的自我照顾。");
@@ -449,7 +659,8 @@ export function analyzeEntries(entries: Entry[]): Insight {
   return {
     headline: `你最近更常感到「${top.mood.label}」`,
     body: parts.join(""),
-    suggestions: suggestions.slice(0, 3),
+    suggestions: Array.from(new Set(suggestions)).slice(0, 3),
+    evidence,
   };
 }
 

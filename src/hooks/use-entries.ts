@@ -4,6 +4,8 @@ import {
   saveEntries,
   sortByNewest,
   isSample,
+  seedEntries,
+  type ActivityKey,
   type Entry,
   type FollowUp,
   type MoodKey,
@@ -37,7 +39,13 @@ export function useEntries() {
   }, []);
 
   const addEntry = useCallback(
-    (input: { mood: MoodKey; intensity: number; note: string; triggers?: TriggerKey[] }) => {
+    (input: {
+      mood: MoodKey;
+      intensity: number;
+      note: string;
+      triggers?: TriggerKey[];
+      activity?: ActivityKey | null;
+    }) => {
       const auto = detectTriggers(input.note);
       const triggers = Array.from(new Set([...(input.triggers ?? []), ...auto]));
       const entry: Entry = {
@@ -47,6 +55,7 @@ export function useEntries() {
         intensity: input.intensity,
         note: input.note.trim(),
         triggers,
+        ...(input.activity ? { activity: input.activity } : {}),
       };
       commit([entry, ...loadEntries()]);
       return entry;
@@ -75,5 +84,23 @@ export function useEntries() {
     [commit],
   );
 
-  return { entries, ready, addEntry, removeEntry, clearSamples, addFollowUp };
+  /** 删除全部记录（包括示例），之后不会再自动填入示例 */
+  const clearAll = useCallback(() => commit([]), [commit]);
+
+  /** 重新载入示例数据，保留用户自己的记录 */
+  const restoreSamples = useCallback(
+    () => commit([...loadEntries().filter((e) => !isSample(e)), ...seedEntries()]),
+    [commit],
+  );
+
+  return {
+    entries,
+    ready,
+    addEntry,
+    removeEntry,
+    clearSamples,
+    addFollowUp,
+    clearAll,
+    restoreSamples,
+  };
 }

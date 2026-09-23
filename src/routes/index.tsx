@@ -43,6 +43,12 @@ function Index() {
       <section className="animate-rise">
         <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">MindCare</h1>
         <p className="mt-3 text-base text-muted-foreground sm:text-lg">今天，也给自己一点空间。</p>
+        <Link
+          to="/about"
+          className="mt-3 inline-flex text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        >
+          了解 MindCare 的设计思路
+        </Link>
       </section>
 
       <SampleNotice />

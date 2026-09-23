@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { MoodComposer } from "@/components/mood-composer";
 import { SampleNotice } from "@/components/sample-notice";
 import { useEntries } from "@/hooks/use-entries";
-import { downloadCsv, formatDate, isSample, moodOf, triggerLabel } from "@/lib/mood";
+import { activityOf, downloadCsv, formatDate, isSample, moodOf, triggerLabel } from "@/lib/mood";
 
 export const Route = createFileRoute("/journal")({
   head: () => ({
@@ -89,6 +89,11 @@ function JournalPage() {
                       强度 {e.intensity}/10
                     </span>
                     <span className="text-xs text-muted-foreground">{formatDate(e.createdAt)}</span>
+                    {e.activity && (
+                      <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-muted-foreground">
+                        {activityOf(e.activity).emoji} {activityOf(e.activity).label}
+                      </span>
+                    )}
                     {isSample(e) && (
                       <span className="rounded-full border border-dashed border-primary/50 px-2 py-0.5 text-[11px] text-muted-foreground">
                         示例

@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
-import { Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronDown, Sparkles } from "lucide-react";
 import { useEntries } from "@/hooks/use-entries";
 import { SampleNotice } from "@/components/sample-notice";
 import {
+  activityStats,
   analyzeEntries,
+  whatWorks,
   entryScore,
   lastNDays,
   moodDistribution,
@@ -85,7 +87,7 @@ function TrendChart({ points }: { points: { label: string; score: number | null;
 }
 
 function InsightsPage() {
-  const { entries, ready } = useEntries();
+  const { entries, ready, restoreSamples } = useEntries();
 
   const days = useMemo(() => lastNDays(entries, 7), [entries]);
   const points = days.map((d) => {
@@ -100,6 +102,9 @@ function InsightsPage() {
   const insight = analyzeEntries(entries);
   const breakdown = useMemo(() => triggerMoodBreakdown(entries), [entries]);
   const slots = useMemo(() => timeOfDayStats(entries), [entries]);
+  const scenes = useMemo(() => activityStats(entries), [entries]);
+  const methods = useMemo(() => whatWorks(entries), [entries]);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
 
   if (ready && entries.length === 0) {
     return (
@@ -108,12 +113,20 @@ function InsightsPage() {
         <p className="mt-3 text-sm text-muted-foreground">
           还没有记录。写下第一条感受后，这里会出现你的情绪趋势。
         </p>
-        <Link
-          to="/"
-          className="mt-6 inline-flex rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground"
-        >
-          去记录情绪
-        </Link>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <Link
+            to="/"
+            className="inline-flex rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground"
+          >
+            去记录情绪
+          </Link>
+          <button
+            onClick={restoreSamples}
+            className="inline-flex rounded-full border border-border bg-card px-6 py-2.5 text-sm font-medium transition-colors hover:bg-secondary"
+          >
+            载入示例看看效果
+          </button>
+        </div>
       </div>
     );
   }
@@ -222,6 +235,53 @@ function InsightsPage() {
       )}
 
       <section className="card-soft px-6 py-6 sm:px-8">
+        <h2 className="font-display text-lg font-semibold">在做什么的时候，感受如何</h2>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          按记录时选的「此刻在做什么」分组，看看哪些场景让你更舒展、哪些更消耗。
+        </p>
+        {scenes.length === 0 ? (
+          <p className="mt-5 text-sm text-muted-foreground">
+            记录时选一下「此刻在做什么」，这里会显示不同场景下的感受。
+          </p>
+        ) : (
+          <>
+            <ul className="mt-6 space-y-4">
+              {scenes.map((sc) => (
+                <li key={sc.key}>
+                  <div className="flex items-baseline justify-between text-sm">
+                    <span>
+                      {sc.emoji} {sc.label}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{sc.count} 条记录</span>
+                  </div>
+                  <div
+                    className="mt-2 flex h-3 overflow-hidden rounded-full bg-secondary"
+                    title={`舒展 ${sc.bright} · 一般 ${sc.neutral} · 偏消耗 ${sc.heavy}`}
+                  >
+                    <span style={{ width: `${(sc.bright / sc.count) * 100}%`, backgroundColor: "var(--mood-calm)" }} />
+                    <span style={{ width: `${(sc.neutral / sc.count) * 100}%`, backgroundColor: "var(--mood-neutral)" }} />
+                    <span style={{ width: `${(sc.heavy / sc.count) * 100}%`, backgroundColor: "var(--mood-anxious)" }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              {[
+                ["舒展", "var(--mood-calm)"],
+                ["一般", "var(--mood-neutral)"],
+                ["偏消耗", "var(--mood-anxious)"],
+              ].map(([label, color]) => (
+                <span key={label} className="flex items-center gap-1">
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                  {label}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="card-soft px-6 py-6 sm:px-8">
         <h2 className="font-display text-lg font-semibold">一天里的情绪强度</h2>
         <p className="mt-1.5 text-sm text-muted-foreground">按记录时间分成四个时段的平均强度。</p>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -241,6 +301,46 @@ function InsightsPage() {
       </section>
 
 
+      <section className="card-soft px-6 py-6 sm:px-8">
+        <h2 className="font-display text-lg font-semibold">什么对我有效</h2>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          在紧绷或低落时做完调节、又评了一次分的记录。下降越多，说明这个方法对你越有帮助。
+        </p>
+        {methods.length === 0 ? (
+          <p className="mt-5 text-sm text-muted-foreground">
+            下次做完呼吸练习后评一下现在的感受，这里会告诉你哪种方法对你更有效。
+          </p>
+        ) : (
+          <ul className="mt-5 space-y-3">
+            {methods.map((m, i) => (
+              <li
+                key={m.label}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-secondary/50 px-4 py-3.5"
+              >
+                <div>
+                  <p className="text-sm font-medium">
+                    🫁 {m.label}
+                    {i === 0 && m.avgDrop >= 1 && (
+                      <span className="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-normal">
+                        目前最有效
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    做了 {m.count} 次 · 平均 {m.avgBefore} → {m.avgAfter}
+                    {m.sampleOnly ? " · 示例数据" : ""}
+                    {m.count < 3 ? " · 记录还不多，仅供参考" : ""}
+                  </p>
+                </div>
+                <span className="font-display text-lg tabular-nums">
+                  {m.avgDrop > 0 ? `↓ ${m.avgDrop}` : m.avgDrop < 0 ? `↑ ${-m.avgDrop}` : "—"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section className="rounded-3xl border border-border bg-primary-soft/70 px-6 py-7 shadow-[var(--shadow-soft)] sm:px-8">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Sparkles className="h-4 w-4" />
@@ -248,6 +348,25 @@ function InsightsPage() {
         </div>
         <h2 className="mt-3 font-display text-xl font-semibold">{insight.headline}</h2>
         <p className="mt-3 text-sm leading-relaxed text-foreground/85">{insight.body}</p>
+        {insight.evidence.length > 0 && (
+          <>
+            <button
+              onClick={() => setEvidenceOpen((v) => !v)}
+              aria-expanded={evidenceOpen}
+              className="mt-3 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              为什么这样说？
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${evidenceOpen ? "rotate-180" : ""}`} />
+            </button>
+            {evidenceOpen && (
+              <ul className="mt-2 space-y-1.5 border-l-2 border-primary/40 pl-3 text-xs leading-relaxed text-foreground/80">
+                {insight.evidence.map((ev) => (
+                  <li key={ev}>{ev}</li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
         <ul className="mt-5 space-y-2">
           {insight.suggestions.map((s) => (
             <li key={s} className="flex gap-2 rounded-2xl bg-card/80 px-4 py-3 text-sm">

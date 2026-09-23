@@ -3,7 +3,11 @@ import { useState } from "react";
 import { Footprints, Moon, Music, Pause, Play, Wind } from "lucide-react";
 import { DailyPrompt } from "@/components/daily-prompt";
 import { BreathingSession } from "@/components/breathing-session";
-import { BREATHING_PLANS } from "@/lib/care-recs";
+import { BREATHING_PLANS, type BreathingKey } from "@/lib/care-recs";
+import { RecommendationPanel } from "@/components/recommendation-panel";
+import { useEntries } from "@/hooks/use-entries";
+import { isSample, moodOf } from "@/lib/mood";
+import { assessRisk } from "@/lib/safety";
 import { AMBIENT_ORDER, AMBIENT_TRACKS, toggleAmbient } from "@/lib/ambient";
 import { useAmbient } from "@/hooks/use-ambient";
 import { toast } from "sonner";
@@ -21,7 +25,17 @@ export const Route = createFileRoute("/care")({
   component: CarePage,
 });
 
-const PLAN_KEYS = ["slow", "box", "relax478"] as const;
+const PLAN_KEYS: BreathingKey[] = ["slow", "box", "relax478"];
+
+/** 最近多久内的记录，才在自我关怀页顶部做个性化推荐 */
+const RECENT_HOURS = 6;
+
+function agoText(iso: string) {
+  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
+  if (min < 1) return "刚刚";
+  if (min < 60) return `${min} 分钟前`;
+  return `${Math.round(min / 60)} 小时前`;
+}
 
 
 
@@ -38,8 +52,15 @@ const NIGHT = [
 ];
 
 function CarePage() {
-  const [breathing, setBreathing] = useState<string | null>(null);
+  const [breathing, setBreathing] = useState<BreathingKey | null>(null);
   const { playing } = useAmbient();
+  const { entries, ready } = useEntries();
+  // 只根据用户自己最近的一条记录做推荐，示例数据不参与
+  const latestOwn = entries.find((e) => !isSample(e));
+  const recent =
+    ready && latestOwn && Date.now() - new Date(latestOwn.createdAt).getTime() < RECENT_HOURS * 3_600_000
+      ? latestOwn
+      : null;
 
   return (
     <div className="space-y-6">
@@ -47,6 +68,22 @@ function CarePage() {
         <h1 className="font-display text-3xl font-semibold tracking-tight">现在，照顾一下自己</h1>
         <p className="mt-2 text-sm text-muted-foreground">选一件最容易做到的，就从它开始。</p>
       </header>
+
+      {recent && (
+        <section className="card-soft px-6 pb-7 pt-1 sm:px-8">
+          <RecommendationPanel
+            key={recent.id}
+            entry={recent}
+            risk={assessRisk({
+              valence: moodOf(recent.mood).valence,
+              intensity: recent.intensity,
+              note: recent.note,
+            })}
+            heading={`根据你${agoText(recent.createdAt)}的记录，更推荐你`}
+            showCareLink={false}
+          />
+        </section>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="card-soft px-6 py-6">
@@ -56,7 +93,7 @@ function CarePage() {
           <h2 className="mt-3 font-display text-xl font-semibold">🧘 挑一个呼吸节奏</h2>
           <ul className="mt-4 space-y-2">
             {PLAN_KEYS.map((k) => {
-              const plan = BREATHING_PLANS[k]!;
+              const plan = BREATHING_PLANS[k];
               return (
                 <li key={k}>
                   <button
@@ -156,7 +193,7 @@ function CarePage() {
       <DailyPrompt />
 
       {breathing && (
-        <BreathingSession plan={BREATHING_PLANS[breathing]!} onClose={() => setBreathing(null)} />
+        <BreathingSession plan={BREATHING_PLANS[breathing]} onClose={() => setBreathing(null)} />
       )}
 
     </div>
