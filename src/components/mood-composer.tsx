@@ -128,6 +128,63 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
       >
         保存今天的情绪
       </button>
+
+      {rec && (
+        <div className="animate-rise mt-8 rounded-3xl border border-border bg-primary-soft/60 px-5 py-6 sm:px-6">
+          <h3 className="font-display text-lg font-semibold">为你推荐的几件小事</h3>
+          <p className="mt-1.5 text-sm text-muted-foreground">{rec.intro}</p>
+
+          <div className="mt-5 space-y-3">
+            <div className="rounded-2xl bg-card/85 px-4 py-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Wind className="h-4 w-4" /> 呼吸练习
+              </div>
+              <p className="mt-2 text-sm font-medium">{rec.breathing.title}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{rec.breathing.rhythm}</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+                {rec.breathing.desc}
+              </p>
+              <button
+                onClick={() => setBreathing(true)}
+                className="mt-3 rounded-full bg-primary px-5 py-2 text-xs font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
+              >
+                开始呼吸练习
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-card/85 px-4 py-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Music className="h-4 w-4" /> 放松音乐
+              </div>
+              <p className="mt-2 text-sm font-medium">
+                {rec.music.emoji} {rec.music.title}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{rec.music.desc}</p>
+            </div>
+
+            <div className="rounded-2xl bg-card/85 px-4 py-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Footprints className="h-4 w-4" /> 轻运动
+              </div>
+              <p className="mt-2 text-sm font-medium">{rec.move.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{rec.move.desc}</p>
+            </div>
+          </div>
+
+          <p className="mt-4 text-xs leading-relaxed text-foreground/75">🌱 {rec.encouragement}</p>
+          <Link
+            to="/care"
+            className="mt-4 inline-flex text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            去自我关怀页看更多
+          </Link>
+        </div>
+      )}
+
+      {breathing && (
+        <BreathingSession plan={rec?.breathing} onClose={() => setBreathing(false)} />
+      )}
     </section>
+
   );
 }
