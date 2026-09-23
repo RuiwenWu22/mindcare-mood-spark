@@ -6,7 +6,7 @@ export function BreathingSession({
   plan = BREATHING_PLANS["slow"]!,
   onClose,
 }: {
-  plan?: BreathingPlan;
+  plan?: BreathingPlan | undefined;
   onClose: () => void;
 }) {
   const phases = plan.phases;

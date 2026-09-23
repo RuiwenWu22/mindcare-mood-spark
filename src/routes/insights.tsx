@@ -97,6 +97,8 @@ function InsightsPage() {
   const dist = moodDistribution(entries);
   const triggers = triggerRanking(entries);
   const insight = analyzeEntries(entries);
+  const breakdown = useMemo(() => triggerMoodBreakdown(entries), [entries]);
+  const slots = useMemo(() => timeOfDayStats(entries), [entries]);
 
   if (ready && entries.length === 0) {
     return (
