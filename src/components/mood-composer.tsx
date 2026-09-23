@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { Footprints, Music, Wind } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { MOODS, TRIGGERS, type MoodKey, type TriggerKey } from "@/lib/mood";
+import { recommendFor, type CareRecommendation } from "@/lib/care-recs";
+import { BreathingSession } from "@/components/breathing-session";
 import { useEntries } from "@/hooks/use-entries";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +14,8 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
   const [intensity, setIntensity] = useState(5);
   const [note, setNote] = useState("");
   const [triggers, setTriggers] = useState<TriggerKey[]>([]);
+  const [rec, setRec] = useState<CareRecommendation | null>(null);
+  const [breathing, setBreathing] = useState(false);
 
   const toggleTrigger = (key: TriggerKey) =>
     setTriggers((prev) => (prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]));
@@ -20,6 +26,7 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
       return;
     }
     addEntry({ mood, intensity, note, triggers });
+    setRec(recommendFor(mood, intensity));
     setMood(null);
     setIntensity(5);
     setNote("");
@@ -28,6 +35,7 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
       description: "可以到「情绪日记」里回顾它。",
     });
   };
+
 
   return (
     <section className="card-soft animate-rise px-6 py-7 sm:px-8">
