@@ -50,8 +50,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <footer className="mx-auto max-w-5xl px-5 pb-28 md:pb-10">
         <p className="rounded-2xl bg-secondary/70 px-5 py-4 text-xs leading-relaxed text-muted-foreground">
-          MindCare 是自我关怀工具，不提供医学诊断或心理治疗。如果你正处于危机或有伤害自己的想法，请及时联系当地紧急服务或专业支持。
+          MindCare 是自我关怀工具，不提供医学诊断或心理治疗。如果你正处于危机或有伤害自己的念头，请拨打全国统一心理援助热线
+          <a href="tel:12356" className="mx-1 font-medium text-foreground underline underline-offset-2">
+            12356
+          </a>
+          （多地已提供 24 小时服务），或拨打
+          <a href="tel:120" className="mx-1 font-medium text-foreground underline underline-offset-2">
+            120
+          </a>
+          联系当地紧急服务。
         </p>
+
       </footer>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/90 backdrop-blur-xl md:hidden">
