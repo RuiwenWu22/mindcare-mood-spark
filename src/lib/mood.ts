@@ -129,7 +129,7 @@ export function seedEntries(): Entry[] {
       mood: "anxious",
       intensity: 8,
       note: "项目的 ddl 就在这周，任务堆在一起，晚上一直睡不着。",
-      triggers: ["work", "deadline", "sleep"],
+      triggers: ["work", "health"],
     },
     {
       id: "seed-3",
@@ -153,7 +153,7 @@ export function seedEntries(): Entry[] {
       mood: "sad",
       intensity: 5,
       note: "一个人待着的时候容易想太多，有点低落，但也没什么特别的事发生。",
-      triggers: ["alone", "self"],
+      triggers: ["alone", "future"],
     },
   ];
 }
