@@ -6,6 +6,7 @@ import { BottomSheet } from "@/components/bottom-sheet";
 import { Placeholder, SectionCard } from "@/components/section";
 import { RecoverySetup } from "@/components/recovery/setup";
 import { UnsentAnalysis, UnsentEditor } from "@/components/recovery/unsent-editor";
+import { RecoveryDemo } from "@/components/recovery/recovery-demo";
 import { useRecovery } from "@/hooks/use-recovery";
 import {
   RELATIONSHIP_STATUS,
@@ -33,6 +34,7 @@ function RecoveryPage() {
   const [open, setOpen] = useState<UnsentMessage | null>(null);
   const [reminder, setReminder] = useState("");
   const [confirm, setConfirm] = useState(false);
+  const [demo, setDemo] = useState(false);
 
   const urgeOf = (id?: string) => (id ? r.urges.find((u) => u.id === id) : undefined);
   const unsent = [...r.unsent].sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -44,7 +46,12 @@ function RecoveryPage() {
           <ArrowLeft className="h-4 w-4" /> 今天
         </Link>
         <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">恢复空间</h1>
-        <p className="mt-2 text-sm text-muted-foreground">这里的内容只保存在这台设备上，不会发送给任何人。</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          这里的内容只保存在这台设备上，不会发送给任何人。
+          <button onClick={() => setDemo(true)} className="ml-1 underline underline-offset-4 hover:text-foreground">
+            看看怎么用
+          </button>
+        </p>
       </header>
 
       {!r.ready ? (
@@ -214,6 +221,9 @@ function RecoveryPage() {
         </>
       )}
 
+      <BottomSheet open={demo} onClose={() => setDemo(false)} label="失恋恢复模式示例">
+        {demo && <RecoveryDemo onClose={() => setDemo(false)} />}
+      </BottomSheet>
       <BottomSheet open={writing} onClose={() => setWriting(false)} label="写一段没有发送的话">
         {writing && <UnsentEditor onClose={() => setWriting(false)} />}
       </BottomSheet>

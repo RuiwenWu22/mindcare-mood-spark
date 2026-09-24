@@ -13,7 +13,7 @@ import { activityStats, entryScore, lastNDays, moodDistribution, moodOf, songsBy
 import { DAY_PARTS, nextWeekTips, triggerInsight, triggerStats, weeklyDiscovery, whatWorks } from "@/lib/insights";
 import { TRIGGER_DOT_LIMIT, TriggerRows } from "@/components/trigger-rows";
 import { RecoveryInsights } from "@/components/recovery/recovery-insights";
-import { demoData } from "@/lib/demo";
+import { demoData, recoveryDemo } from "@/lib/demo";
 
 export const Route = createFileRoute("/insights")({
   validateSearch: (s: Record<string, unknown>): { demo?: 1 } => (s["demo"] === 1 || s["demo"] === "1" ? { demo: 1 } : {}),
@@ -92,6 +92,7 @@ function InsightsPage() {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => setNow(new Date()), []);
   const sample = useMemo(() => (demo && now ? demoData(now) : null), [demo, now]);
+  const recoverySample = useMemo(() => (demo && now ? recoveryDemo(now) : undefined), [demo, now]);
   const entries = sample?.entries ?? E.entries;
   const interventions = sample?.interventions ?? I.interventions;
   const logs = sample?.logs ?? realLogs;
@@ -252,8 +253,8 @@ function InsightsPage() {
             </SectionCard>
           )}
 
-          {/* 失恋恢复模式（开启后才显示） */}
-          {!demo && now && <RecoveryInsights now={now} />}
+          {/* 失恋恢复模式：开启后才显示；示例洞察里显示示例数据 */}
+          {now && (recoverySample ? <RecoveryInsights now={now} sample={recoverySample} /> : <RecoveryInsights now={now} />)}
 
           {/* 4. 7 天情绪趋势 */}
           <SectionCard title="最近 7 天情绪趋势" desc="越高代表那天的感受越轻松；空缺表示那天没有记录。">
