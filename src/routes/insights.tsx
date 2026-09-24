@@ -4,15 +4,14 @@ import { ChevronDown } from "lucide-react";
 import { useEntries } from "@/hooks/use-entries";
 import { useBody } from "@/hooks/use-body";
 import { useInterventions } from "@/hooks/use-interventions";
-import { bodyMoodStats, type BodyBucket } from "@/lib/body";
+import { bodyInsight, bodyMoodStats } from "@/lib/body";
 import { CycleCard } from "@/components/cycle-card";
 import { AiCard, WhyToggle } from "@/components/ai-card";
-import { Placeholder, SectionCard, ValenceBar, ValenceLegend } from "@/components/section";
+import { Placeholder, SectionCard, ValenceRows } from "@/components/section";
 import { useRecordSheet } from "@/components/record-sheet";
 import { activityStats, entryScore, lastNDays, moodDistribution, moodOf, songsByMood, triggerMoodBreakdown } from "@/lib/mood";
 import { DAY_PARTS, nextWeekTips, weeklyDiscovery, whatWorks } from "@/lib/insights";
 import { demoData } from "@/lib/demo";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/insights")({
   validateSearch: (s: Record<string, unknown>): { demo?: 1 } => (s["demo"] === 1 || s["demo"] === "1" ? { demo: 1 } : {}),
@@ -125,6 +124,7 @@ function InsightsPage() {
   );
   const scenes = useMemo(() => activityStats(entries), [entries]);
   const body = useMemo(() => bodyMoodStats(entries, logs), [entries, logs]);
+  const bodyAi = useMemo(() => bodyInsight(entries, logs), [entries, logs]);
   const playlist = useMemo(() => songsByMood(entries), [entries]);
 
   const recordButton = (
@@ -327,32 +327,47 @@ function InsightsPage() {
                 {scenes.length === 0 ? (
                   <p className="mt-2 text-sm text-muted-foreground">记录时在「更多」里选一下此刻在做什么。</p>
                 ) : (
-                  <ul className="mt-3 space-y-3">
-                    {scenes.map((sc) => (
-                      <li key={sc.key}>
-                        <div className="flex items-baseline justify-between text-sm">
-                          <span>
-                            {sc.emoji} {sc.label}
-                          </span>
-                          <span className="text-xs text-muted-foreground">{sc.count} 条</span>
-                        </div>
-                        <ValenceBar className="mt-1.5" bright={sc.bright} neutral={sc.neutral} heavy={sc.heavy} />
-                      </li>
-                    ))}
-                  </ul>
+                  <ValenceRows className="mt-3" rows={scenes} />
                 )}
               </div>
               <div>
                 <h3 className="text-sm font-medium">睡眠、活动和情绪</h3>
+                <p className="mt-1 text-xs text-muted-foreground">看看不同睡眠和活动状态下，你通常处于怎样的情绪状态。</p>
                 {body.sleep.every((b) => b.days === 0) && body.activity.every((b) => b.days === 0) ? (
-                  <p className="mt-2 text-sm text-muted-foreground">在「今天」记一下睡眠和活动量，这里会显示它们和心情的关系。</p>
+                  <p className="mt-3 text-sm text-muted-foreground">在「今天」记一下睡眠和活动量，这里会显示它们和心情的关系。</p>
                 ) : (
-                  <div className="mt-3 grid gap-6 md:grid-cols-2">
-                    <BodyBlock title="睡眠" buckets={body.sleep} />
-                    <BodyBlock title="活动量" buckets={body.activity} />
-                  </div>
+                  <>
+                    <AiCard title="AI 发现" className="mt-3">
+                      {bodyAi.status === "found" ? (
+                        <ul className="space-y-2.5">
+                          {bodyAi.lines.map((l) => (
+                            <li key={l.headline}>
+                              <p className="text-[15px] font-medium leading-relaxed">{l.headline}</p>
+                              <p className="mt-0.5 text-sm leading-relaxed text-foreground/80">{l.detail}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm leading-relaxed">
+                          {bodyAi.status === "few"
+                            ? "目前记录还比较少，再记录几次后会更容易看出规律。"
+                            : "目前还看不出睡眠、活动和情绪之间的明显关系。"}
+                        </p>
+                      )}
+                      <WhyToggle items={bodyAi.evidence} />
+                    </AiCard>
+                    <div className="mt-5 grid gap-6 md:grid-cols-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">睡眠</p>
+                        <ValenceRows className="mt-2" rows={body.sleep.map((b) => ({ ...b, label: `睡得${b.label}` }))} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">活动量</p>
+                        <ValenceRows className="mt-2" rows={body.activity} />
+                      </div>
+                    </div>
+                  </>
                 )}
-                <ValenceLegend className="mt-3" />
               </div>
               {!demo && <CycleCard />}
               <div>
@@ -396,29 +411,6 @@ function InsightsPage() {
           </details>
         </>
       )}
-    </div>
-  );
-}
-
-function BodyBlock({ title, buckets }: { title: string; buckets: BodyBucket[] }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{title}</p>
-      <ul className="mt-2 space-y-2.5">
-        {buckets.map((b) => (
-          <li key={b.key}>
-            <div className="flex items-baseline justify-between text-sm">
-              <span>
-                {b.emoji} {b.label}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {b.days} 天 · {b.records} 条
-              </span>
-            </div>
-            <ValenceBar className={cn("mt-1.5")} bright={b.bright} neutral={b.neutral} heavy={b.heavy} />
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

@@ -83,50 +83,90 @@ export const VALENCE_COLORS = {
   heavy: "var(--mood-anxious)",
 } as const;
 
-export function ValenceBar({
-  bright,
-  neutral,
-  heavy,
-  className,
-}: {
-  bright: number;
-  neutral: number;
-  heavy: number;
-  className?: string;
-}) {
-  const total = bright + neutral + heavy;
-  return (
-    <div
-      className={cn("flex h-2.5 overflow-hidden rounded-full bg-secondary", className)}
-      title={`舒展 ${bright} · 一般 ${neutral} · 偏消耗 ${heavy}`}
-    >
-      {total > 0 && (
-        <>
-          <span style={{ width: `${(bright / total) * 100}%`, backgroundColor: VALENCE_COLORS.bright }} />
-          <span style={{ width: `${(neutral / total) * 100}%`, backgroundColor: VALENCE_COLORS.neutral }} />
-          <span style={{ width: `${(heavy / total) * 100}%`, backgroundColor: VALENCE_COLORS.heavy }} />
-        </>
-      )}
-    </div>
-  );
-}
+const KINDS = [
+  { key: "bright", label: "舒展" },
+  { key: "neutral", label: "一般" },
+  { key: "heavy", label: "偏消耗" },
+] as const;
 
-export function ValenceLegend({ className }: { className?: string }) {
+export type ValenceRow = { key: string; emoji?: string; label: string; bright: number; neutral: number; heavy: number };
+
+/** 一组里最多有这么多条记录时，一条记录画一个色块；更多时才用百分比长条 */
+export const BLOCK_LIMIT = 20;
+
+const totalOf = (r: ValenceRow) => r.bright + r.neutral + r.heavy;
+
+/**
+ * 不同状态下的情绪构成。
+ * - 记录少（整组每行都 ≤ 20 条）：一条记录一个色块，按 舒展 → 一般 → 偏消耗 排列
+ * - 记录多：100% 长条，上方直接写百分比和次数
+ * 每行都直接写出次数，不依赖底部图例；同一组里所有行用同一种画法，方便对比。
+ */
+export function ValenceRows({ rows, className }: { rows: ValenceRow[]; className?: string }) {
+  const blocks = Math.max(0, ...rows.map(totalOf)) <= BLOCK_LIMIT;
   return (
-    <div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground", className)}>
-      {(
-        [
-          ["舒展", VALENCE_COLORS.bright],
-          ["一般", VALENCE_COLORS.neutral],
-          ["偏消耗", VALENCE_COLORS.heavy],
-        ] as const
-      ).map(([label, color]) => (
-        <span key={label} className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-          {label}
-        </span>
-      ))}
-    </div>
+    <ul className={cn("space-y-4", className)}>
+      {rows.map((r) => {
+        const n = totalOf(r);
+        const parts = KINDS.map((k) => ({ ...k, count: r[k.key] })).filter((k) => k.count > 0);
+        const summary = parts.map((k) => `${k.label} ${k.count} 次`).join("，");
+        return (
+          <li key={r.key}>
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="font-medium">
+                {r.emoji ? `${r.emoji} ` : ""}
+                {r.label}
+              </span>
+              <span className="shrink-0 text-xs text-muted-foreground">{n ? `${n} 次记录` : "还没有记录"}</span>
+            </div>
+            {n > 0 &&
+              (blocks ? (
+                <>
+                  <div className="mt-2 flex flex-wrap gap-1" role="img" aria-label={`${n} 次记录：${summary}`}>
+                    {parts.flatMap((k) =>
+                      Array.from({ length: k.count }, (_, i) => (
+                        <span
+                          key={`${k.key}-${i}`}
+                          className="h-4 w-4 rounded-[5px] sm:h-[18px] sm:w-[18px]"
+                          style={{ backgroundColor: VALENCE_COLORS[k.key] }}
+                        />
+                      )),
+                    )}
+                  </div>
+                  <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground" aria-hidden>
+                    {parts.map((k) => (
+                      <span key={k.key} className="flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: VALENCE_COLORS[k.key] }} />
+                        {k.label} {k.count} 次
+                      </span>
+                    ))}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                    {parts.map((k) => (
+                      <span key={k.key} className="flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: VALENCE_COLORS[k.key] }} />
+                        {k.label} {Math.round((k.count / n) * 100)}%（{k.count} 次）
+                      </span>
+                    ))}
+                  </p>
+                  <div
+                    className="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-secondary"
+                    role="img"
+                    aria-label={`${n} 次记录：${summary}`}
+                  >
+                    {parts.map((k) => (
+                      <span key={k.key} style={{ width: `${(k.count / n) * 100}%`, backgroundColor: VALENCE_COLORS[k.key] }} />
+                    ))}
+                  </div>
+                </>
+              ))}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

@@ -197,11 +197,11 @@ export function bodyMoodStats(entries: Entry[], logs: DayLog[]) {
 
 const share = (b: BodyBucket) => b.heavy / b.records;
 
-/** 只有差异明显、且两边都有至少 2 条记录时，才给出结论 */
-function contrast(buckets: BodyBucket[]) {
+/** 只有差异明显、且两边都有足够的记录时，才给出结论 */
+function contrast(buckets: BodyBucket[], minRecords = 2) {
   // 比例相同时，记录多的更可信
   const usable = buckets
-    .filter((b) => b.records >= 2)
+    .filter((b) => b.records >= minRecords)
     .sort((a, b) => share(b) - share(a) || b.records - a.records);
   if (usable.length < 2) return null;
   const worst = usable[0]!;
@@ -231,6 +231,58 @@ export function bodyFindings(entries: Entry[], logs: DayLog[]): ExtraFindings {
     if (a.worst.key === "low") out.suggestions.push("状态低的时候，哪怕出门走 10 分钟，也可能让你缓过来一点。");
   }
   return out;
+}
+
+/* ---------------- 洞察页：✨ AI 发现 ---------------- */
+
+/** 两组都至少这么多条记录，才下结论 */
+export const BODY_MIN_RECORDS = 3;
+
+export type BodyInsight =
+  | { status: "few"; evidence: string[] }
+  | { status: "unclear"; evidence: string[] }
+  | { status: "found"; lines: { headline: string; detail: string }[]; evidence: string[] };
+
+const SLEEP_RANK: Record<string, number> = { poor: 0, ok: 1, good: 2 };
+const LEVEL_RANK: Record<string, number> = { low: 0, mid: 1, high: 2 };
+
+/**
+ * 睡眠、活动量和情绪的关系。只说"相关"，不说"因为"；
+ * 两组都不少于 3 条、偏消耗的比例相差至少 40 个百分点才下结论。
+ */
+export function bodyInsight(entries: Entry[], logs: DayLog[]): BodyInsight {
+  const { sleep, activity } = bodyMoodStats(entries, logs);
+  const evidence = [...sleep.map((b) => ["睡得", b] as const), ...activity.map((b) => ["", b] as const)]
+    .filter(([, b]) => b.days > 0)
+    .map(
+      ([pre, b]) =>
+        `${pre}「${b.label}」的 ${b.days} 天里记了 ${b.records} 次：舒展 ${b.bright} 次，一般 ${b.neutral} 次，偏消耗 ${b.heavy} 次。`,
+    );
+  const enough = (bs: BodyBucket[]) => bs.filter((b) => b.records >= BODY_MIN_RECORDS).length >= 2;
+  if (!enough(sleep) && !enough(activity)) {
+    evidence.push(`至少要有两种状态各记满 ${BODY_MIN_RECORDS} 次，才会开始比较。`);
+    return { status: "few", evidence };
+  }
+
+  const lines: { headline: string; detail: string }[] = [];
+  const s = contrast(sleep, BODY_MIN_RECORDS);
+  if (s) {
+    const better = SLEEP_RANK[s.best.key]! > SLEEP_RANK[s.worst.key]!;
+    lines.push({
+      headline: better ? "睡眠状态较好时，你的情绪更少偏消耗。" : `睡得「${s.best.label}」的日子，你的情绪反而更少偏消耗。`,
+      detail: `睡得「${s.best.label}」时，${s.best.records} 次记录里${s.best.heavy ? `只有 ${s.best.heavy} 次偏消耗` : "没有偏消耗的"}；睡得「${s.worst.label}」时，${s.worst.records} 次里 ${s.worst.heavy} 次偏消耗。`,
+    });
+  }
+  const a = contrast(activity, BODY_MIN_RECORDS);
+  if (a) {
+    const more = LEVEL_RANK[a.best.key]! > LEVEL_RANK[a.worst.key]!;
+    lines.push({
+      headline: more ? "动得多一些的日子，你的情绪更少偏消耗。" : "动得少一些的日子，你的情绪反而更少偏消耗。",
+      detail: `「${a.best.label}」时，${a.best.records} 次记录里${a.best.heavy ? `只有 ${a.best.heavy} 次偏消耗` : "没有偏消耗的"}；「${a.worst.label}」时，${a.worst.records} 次里 ${a.worst.heavy} 次偏消耗。`,
+    });
+  }
+  evidence.push(`两种状态各至少 ${BODY_MIN_RECORDS} 次记录、偏消耗的比例相差 40% 以上时才算"看出规律"。这只说明它们同时出现，不代表谁导致了谁。`);
+  return lines.length ? { status: "found", lines, evidence } : { status: "unclear", evidence };
 }
 
 /** 导出 CSV 时附带的当天睡眠和步数 */
