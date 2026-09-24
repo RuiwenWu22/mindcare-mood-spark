@@ -4,6 +4,7 @@ import { clearCycle } from "@/lib/cycle";
 import { clearDailyData } from "@/lib/daily";
 import { clearWeatherCache } from "@/lib/weather";
 import { clearInterventions, removeInterventionsFor } from "@/lib/interventions";
+import { clearRecovery } from "@/lib/recovery";
 import type { Song } from "@/lib/songs";
 import {
   loadEntries,
@@ -78,7 +79,7 @@ export function useEntries() {
     [commit],
   );
 
-  /** 删除全部数据：记录、调节记录、身体数据、周期、今日卡片设置 */
+  /** 删除全部数据：记录、调节记录、身体数据、周期、今日卡片设置、失恋恢复模式 */
   const clearAll = useCallback(() => {
     commit([]);
     clearInterventions();
@@ -86,6 +87,7 @@ export function useEntries() {
     clearDailyData();
     clearWeatherCache();
     clearCycle();
+    clearRecovery();
   }, [commit]);
 
   return { entries, ready, addEntry, removeEntry, clearAll };

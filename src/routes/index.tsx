@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { TodayCard } from "@/components/today-card";
+import { RecoveryCard } from "@/components/recovery/recovery-card";
 import { Placeholder } from "@/components/section";
 import { useRecordSheet } from "@/components/record-sheet";
 import { WhyToggle } from "@/components/ai-card";
@@ -86,6 +87,9 @@ function TodayPage() {
 
       {/* ---------- 今天的记录：AI 整理 + 调节结果 ---------- */}
       {today && <TodayRecord entries={entries} interventions={interventions} data={today} />}
+
+      {/* ---------- 失恋恢复模式：次级场景卡 ---------- */}
+      <RecoveryCard />
 
       <TodayStatus />
 

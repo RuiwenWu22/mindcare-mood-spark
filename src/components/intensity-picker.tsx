@@ -6,12 +6,16 @@ export function IntensityPicker({
   onChange,
   label,
   highlight,
+  low = "很轻",
+  high = "很强烈",
 }: {
   value: number | null;
   onChange: (n: number) => void;
   label: string;
   /** 例如调节前的分数，用细边框标出来 */
   highlight?: number;
+  low?: string;
+  high?: string;
 }) {
   return (
     <div>
@@ -40,8 +44,8 @@ export function IntensityPicker({
         })}
       </div>
       <div className="mt-1.5 flex justify-between px-1 text-xs text-muted-foreground">
-        <span>很轻</span>
-        <span>很强烈</span>
+        <span>{low}</span>
+        <span>{high}</span>
       </div>
     </div>
   );

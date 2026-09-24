@@ -3,7 +3,13 @@
  * 目前由可解释的规则完成；每条结论都只来自最近 7 天的真实记录，
  * 数据不够时不下结论（enough = false）。
  */
-import { moodOf, sortByNewest, triggerLabel, type Entry, type Mood } from "@/lib/mood";
+import { TRIGGERS, moodOf, sortByNewest, triggerLabel, type Entry, type Mood } from "@/lib/mood";
+
+/** 次数相同时按标签原本的顺序排，结果在任何浏览器里都一样 */
+const tagIndex = (k: string) => {
+  const i = TRIGGERS.findIndex((t) => t.key === k);
+  return i < 0 ? 99 : i;
+};
 import { actionByTitle, methodHistory, type MethodHistory } from "@/lib/care-recs";
 import type { Intervention } from "@/lib/interventions";
 
@@ -185,4 +191,75 @@ export function latestWithIntervention(entries: Entry[], interventions: Interven
     .filter((i) => i.linked_mood_record_id === latest.id)
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
   return { entry: latest, intervention: done ?? null, action: done ? actionByTitle(done.intervention_name) : undefined };
+}
+
+/* ---------------- 常见的触发因素：✨ AI 发现 ---------------- */
+
+/** 记录少于这么多条时，用更克制的说法 */
+export const TRIGGER_CONFIDENT_MIN = 8;
+
+export type TriggerStat = {
+  key: string;
+  label: string;
+  count: number;
+  bright: number;
+  neutral: number;
+  heavy: number;
+  /** 按情绪列出次数，顺序和 MOODS 一致（舒展 → 一般 → 偏消耗） */
+  moods: { mood: Mood; count: number }[];
+};
+
+export function triggerStats(entries: Entry[]): TriggerStat[] {
+  const acc = new Map<string, Entry[]>();
+  for (const e of entries) for (const t of e.triggers) acc.set(t, [...(acc.get(t) ?? []), e]);
+  const order = (m: Mood) => ["happy", "calm", "okay", "neutral", "anxious", "sad", "irritated", "stressed"].indexOf(m.key);
+  return [...acc.entries()]
+    .map(([key, list]) => {
+      const byMood = new Map<string, number>();
+      list.forEach((e) => byMood.set(e.mood, (byMood.get(e.mood) ?? 0) + 1));
+      const v = list.map((e) => moodOf(e.mood).valence);
+      return {
+        key,
+        label: triggerLabel(key),
+        count: list.length,
+        bright: v.filter((x) => x > 0).length,
+        neutral: v.filter((x) => x === 0).length,
+        heavy: v.filter((x) => x < 0).length,
+        moods: [...byMood.entries()]
+          .map(([k, count]) => ({ mood: moodOf(k as Entry["mood"]), count }))
+          .sort((a, b) => order(a.mood) - order(b.mood)),
+      };
+    })
+    .sort((a, b) => b.count - a.count || tagIndex(a.key) - tagIndex(b.key));
+}
+
+export function triggerInsight(entries: Entry[]): { text: string; evidence: string[] } | null {
+  const stats = triggerStats(entries);
+  const top = stats[0];
+  if (!top) return null;
+  const tied = stats.filter((s) => s.count === top.count);
+  const evidence = [
+    `共 ${entries.length} 条记录，其中 ${entries.filter((e) => e.triggers.length).length} 条选了原因标签。`,
+    ...stats.slice(0, 5).map(
+      (s) => `「${s.label}」${s.count} 次：${s.moods.map((m) => `${m.mood.label} ${m.count}`).join("、")}。`,
+    ),
+  ];
+  const names = tied.map((s) => `「${s.label}」`).join("和");
+
+  if (entries.length < TRIGGER_CONFIDENT_MIN || tied.length > 1) {
+    evidence.push(`记录少于 ${TRIGGER_CONFIDENT_MIN} 条，或几个原因次数一样多时，只做初步观察。`);
+    return {
+      text: `目前${names}出现得相对更多，不过记录还比较少，再记录几次后会更容易看出规律。`,
+      evidence,
+    };
+  }
+
+  let mood = "情绪有起有落。";
+  if (top.heavy === top.count) mood = "而且这些记录都伴随着偏消耗状态。";
+  else if (top.heavy / top.count >= 0.6) mood = `其中 ${top.heavy} 次是偏消耗的。`;
+  else if (top.bright / top.count >= 0.6) mood = "而且多数时候你的状态是舒展的。";
+  return {
+    text: `「${top.label}」目前是出现最多的情绪触发因素，共记录 ${top.count} 次，${mood}`,
+    evidence,
+  };
 }

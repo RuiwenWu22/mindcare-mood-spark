@@ -9,8 +9,10 @@ import { CycleCard } from "@/components/cycle-card";
 import { AiCard, WhyToggle } from "@/components/ai-card";
 import { Placeholder, SectionCard, ValenceRows } from "@/components/section";
 import { useRecordSheet } from "@/components/record-sheet";
-import { activityStats, entryScore, lastNDays, moodDistribution, moodOf, songsByMood, triggerMoodBreakdown } from "@/lib/mood";
-import { DAY_PARTS, nextWeekTips, weeklyDiscovery, whatWorks } from "@/lib/insights";
+import { activityStats, entryScore, lastNDays, moodDistribution, moodOf, songsByMood } from "@/lib/mood";
+import { DAY_PARTS, nextWeekTips, triggerInsight, triggerStats, weeklyDiscovery, whatWorks } from "@/lib/insights";
+import { TRIGGER_DOT_LIMIT, TriggerRows } from "@/components/trigger-rows";
+import { RecoveryInsights } from "@/components/recovery/recovery-insights";
 import { demoData } from "@/lib/demo";
 
 export const Route = createFileRoute("/insights")({
@@ -106,7 +108,8 @@ function InsightsPage() {
     return { label: d.label, score, emoji: moodOf(strongest.mood).emoji };
   });
   const dist = useMemo(() => moodDistribution(entries), [entries]);
-  const breakdown = useMemo(() => triggerMoodBreakdown(entries, 6), [entries]);
+  const triggers = useMemo(() => triggerStats(entries), [entries]);
+  const triggerAi = useMemo(() => triggerInsight(entries), [entries]);
   const parts = useMemo(
     () =>
       [...DAY_PARTS]
@@ -173,7 +176,12 @@ function InsightsPage() {
             {demoButton}
           </div>
         </AiCard>
-      ) : (
+      ) : null}
+
+      {/* 失恋恢复模式：没有情绪记录时也能看到自己的恢复轨迹 */}
+      {!demo && ready && now && entries.length === 0 && <RecoveryInsights now={now} />}
+
+      {!ready || !discovery || (!demo && entries.length === 0) ? null : (
         <>
           {/* 1. AI 本周发现 */}
           <AiCard title="AI 本周发现" size="lg">
@@ -244,60 +252,58 @@ function InsightsPage() {
             </SectionCard>
           )}
 
+          {/* 失恋恢复模式（开启后才显示） */}
+          {!demo && now && <RecoveryInsights now={now} />}
+
           {/* 4. 7 天情绪趋势 */}
           <SectionCard title="最近 7 天情绪趋势" desc="越高代表那天的感受越轻松；空缺表示那天没有记录。">
             <TrendChart points={points} />
           </SectionCard>
 
-          <div className="grid gap-5 md:grid-cols-2">
-            {/* 5. 高频情绪 */}
-            <SectionCard title="高频情绪">
-              <ul className="space-y-3.5">
-                {dist.slice(0, 5).map((d) => (
-                  <li key={d.mood.key}>
-                    <div className="flex items-center justify-between text-sm">
-                      <span>
-                        {d.mood.emoji} {d.mood.label}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {d.count} 次 · {d.percent}%
-                      </span>
-                    </div>
-                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
-                      <div className="h-full rounded-full" style={{ width: `${d.percent}%`, backgroundColor: d.mood.color }} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </SectionCard>
+          {/* 5. 高频情绪 */}
+          <SectionCard title="高频情绪">
+            <ul className="space-y-3.5">
+              {dist.slice(0, 5).map((d) => (
+                <li key={d.mood.key}>
+                  <div className="flex items-center justify-between text-sm">
+                    <span>
+                      {d.mood.emoji} {d.mood.label}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {d.count} 次 · {d.percent}%
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
+                    <div className="h-full rounded-full" style={{ width: `${d.percent}%`, backgroundColor: d.mood.color }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
 
-            {/* 6. 触发因素排行 */}
-            <SectionCard title="常见的触发因素" desc="每条的颜色是这个原因下出现过的情绪。">
-              {breakdown.length === 0 ? (
-                <p className="text-sm text-muted-foreground">记录时选一下「可能和什么有关」，这里就会出现排行。</p>
-              ) : (
-                <ul className="space-y-3.5">
-                  {breakdown.map((b) => (
-                    <li key={b.key}>
-                      <div className="flex items-baseline justify-between text-sm">
-                        <span>{b.label}</span>
-                        <span className="text-xs text-muted-foreground">{b.count} 次</span>
-                      </div>
-                      <div className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-secondary">
-                        {b.segments.map((s) => (
-                          <span
-                            key={s.mood.key}
-                            title={`${s.mood.label} ${s.percent}%`}
-                            style={{ width: `${s.percent}%`, backgroundColor: s.mood.color }}
-                          />
-                        ))}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </SectionCard>
-          </div>
+          {/* 6. 触发因素排行 */}
+          <SectionCard
+            title="常见的触发因素"
+            desc={
+              Math.max(0, ...triggers.map((t) => t.count)) < TRIGGER_DOT_LIMIT
+                ? "每个色块代表一次记录，颜色表示当时的情绪。"
+                : "长条越长，出现的次数越多；颜色表示当时的情绪。"
+            }
+          >
+            {triggers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">记录时选一下「可能和什么有关」，这里就会出现排行。</p>
+            ) : (
+              <>
+                {triggerAi && (
+                  <AiCard title="AI 发现" className="mb-5">
+                    <p className="text-[15px] leading-relaxed">{triggerAi.text}</p>
+                    <WhyToggle items={triggerAi.evidence} />
+                  </AiCard>
+                )}
+                <TriggerRows stats={triggers} />
+              </>
+            )}
+          </SectionCard>
 
           {/* 7. 时段 */}
           <SectionCard title="一天里的情绪变化" desc="不同时段的记录数、平均强度，以及偏消耗的记录有几条。">
