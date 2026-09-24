@@ -83,7 +83,7 @@ function AboutPage() {
       </header>
 
       {/* ---------------- 设计思路 ---------------- */}
-      <section id="design" className="card-soft scroll-mt-24 px-6 py-7 sm:px-8">
+      <section id="design" className="card-soft scroll-mt-24 px-5 py-6 sm:px-7">
         <h2 className="font-display text-2xl font-semibold">设计思路</h2>
 
         <h3 className="mt-6 text-sm font-semibold">想解决的问题</h3>
@@ -154,7 +154,7 @@ function AboutPage() {
       </section>
 
       {/* ---------------- 数据与隐私 ---------------- */}
-      <section id="privacy" className="card-soft scroll-mt-24 px-6 py-7 sm:px-8">
+      <section id="privacy" className="card-soft scroll-mt-24 px-5 py-6 sm:px-7">
         <h2 className="font-display text-2xl font-semibold">数据与隐私</h2>
         <dl className="mt-5 space-y-5 text-sm leading-relaxed">
           <div>
@@ -271,7 +271,7 @@ function AboutPage() {
       </section>
 
       {/* ---------------- 寻求帮助 ---------------- */}
-      <section id="help" className="card-soft scroll-mt-24 px-6 py-7 sm:px-8">
+      <section id="help" className="card-soft scroll-mt-24 px-5 py-6 sm:px-7">
         <h2 className="font-display text-2xl font-semibold">寻求帮助</h2>
         <p className="mt-3 text-sm leading-relaxed text-foreground/85">
           MindCare 只是自我关怀的小工具，不能替代专业帮助。如果你正处于危机，或有伤害自己的念头，请现在联系你信任的人，或者：

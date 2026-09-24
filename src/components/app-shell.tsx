@@ -6,13 +6,10 @@ import { AmbientMiniPlayer } from "@/components/ambient-mini-player";
 
 const NAV = [
   { to: "/", label: "首页", icon: Home },
-  { to: "/journal", label: "情绪日记", icon: NotebookPen },
-  { to: "/insights", label: "情绪洞察", icon: Sparkles },
-  { to: "/care", label: "自我关怀", icon: HeartHandshake },
+  { to: "/journal", label: "日记", icon: NotebookPen },
+  { to: "/insights", label: "洞察", icon: Sparkles },
+  { to: "/care", label: "关怀", icon: HeartHandshake },
 ] as const;
-
-/** 桌面端多一个"关于"；移动端底栏保持四个主功能，"关于"从页脚进入 */
-const DESKTOP_NAV = [...NAV.map(({ to, label }) => ({ to, label })), { to: "/about", label: "关于" }] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -29,7 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
-            {DESKTOP_NAV.map((item) => {
+            {NAV.map((item) => {
               const active = pathname === item.to;
               return (
                 <Link

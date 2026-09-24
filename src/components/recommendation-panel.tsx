@@ -337,7 +337,7 @@ function RecommendationCard({
         </button>
         {showCareLink && (
           <Link to="/care" className="underline underline-offset-4 hover:text-foreground">
-            去自我关怀页看更多
+            去关怀页看更多
           </Link>
         )}
       </div>

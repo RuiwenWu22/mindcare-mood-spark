@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { useEntries } from "@/hooks/use-entries";
 import { useBody } from "@/hooks/use-body";
 import { bodyFindings, bodyMoodStats, type BodyBucket } from "@/lib/body";
 import { SampleNotice } from "@/components/sample-notice";
 import { CycleCard } from "@/components/cycle-card";
+import { Placeholder, SectionCard, Segmented, ValenceBar, ValenceLegend } from "@/components/section";
 import {
   activityStats,
   analyzeEntries,
@@ -48,7 +49,7 @@ function TrendChart({ points }: { points: { label: string; score: number | null;
       : "";
 
   return (
-    <div className="mt-6">
+    <div>
       <svg viewBox={`0 0 ${w} ${h}`} className="h-48 w-full" preserveAspectRatio="none">
         <defs>
           <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
@@ -83,12 +84,17 @@ function TrendChart({ points }: { points: { label: string; score: number | null;
           </span>
         ))}
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">
-        线条越高，代表当天记录里的感受越轻松；空缺表示那天没有记录。
-      </p>
     </div>
   );
 }
+
+type Tab = "trend" | "causes" | "body" | "works";
+const TABS: { key: Tab; label: string }[] = [
+  { key: "trend", label: "情绪趋势" },
+  { key: "causes", label: "原因场景" },
+  { key: "body", label: "身体周期" },
+  { key: "works", label: "有效方法" },
+];
 
 function InsightsPage() {
   const { entries, ready, restoreSamples } = useEntries();
@@ -112,6 +118,16 @@ function InsightsPage() {
   const scenes = useMemo(() => activityStats(entries), [entries]);
   const methods = useMemo(() => whatWorks(entries), [entries]);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>("trend");
+  // 支持 /insights#body 这样的链接直接打开某一类
+  useEffect(() => {
+    const h = window.location.hash.slice(1);
+    if (TABS.some((t) => t.key === h)) setTab(h as Tab);
+  }, []);
+  const pick = (t: Tab) => {
+    setTab(t);
+    window.history.replaceState(null, "", `#${t}`);
+  };
 
   if (ready && entries.length === 0) {
     return (
@@ -141,315 +157,289 @@ function InsightsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">了解你的情绪</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          这些只是从你的记录里看到的一些线索，不是诊断。
-        </p>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">洞察</h1>
+        <p className="mt-2 text-sm text-muted-foreground">这些只是从你的记录里看到的一些线索，不是诊断。</p>
       </header>
 
       <SampleNotice />
 
-      <section className="card-soft px-6 py-6 sm:px-8">
-        <h2 className="font-display text-lg font-semibold">最近 7 天情绪趋势</h2>
-        <TrendChart points={points} />
-      </section>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <section className="card-soft px-6 py-6">
-          <h2 className="font-display text-lg font-semibold">高频情绪</h2>
-          <ul className="mt-5 space-y-4">
-            {dist.slice(0, 5).map((d) => (
-              <li key={d.mood.key}>
-                <div className="flex items-center justify-between text-sm">
-                  <span>
-                    {d.mood.emoji} {d.mood.label}
-                  </span>
-                  <span className="text-muted-foreground">{d.percent}%</span>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${d.percent}%`, backgroundColor: d.mood.color }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="card-soft px-6 py-6">
-          <h2 className="font-display text-lg font-semibold">触发因素频率排行</h2>
-          {triggers.length === 0 ? (
-            <p className="mt-5 text-sm text-muted-foreground">
-              记录时勾选触发因素标签，这里就会出现排行。
-            </p>
-          ) : (
-            <ul className="mt-5 space-y-3">
-              {triggers.slice(0, 6).map((t) => (
-                <li key={t.key} className="flex items-center gap-3">
-                  <span className="w-24 shrink-0 text-sm">{t.label}</span>
-                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
-                    <span
-                      className="block h-full rounded-full bg-accent"
-                      style={{ width: `${Math.max(12, t.ratio * 100)}%` }}
-                    />
-                  </span>
-                  <span className="w-8 text-right text-xs text-muted-foreground">{t.count} 次</span>
+      {/* ---------- 总结：最重要的放在最上面 ---------- */}
+      {!ready ? (
+        <Placeholder className="h-44 w-full rounded-3xl" />
+      ) : (
+        <section className="rounded-3xl border border-border bg-primary-soft/70 px-5 py-6 shadow-[var(--shadow-soft)] sm:px-7">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Sparkles className="h-3.5 w-3.5" />
+            从你的记录来看
+          </div>
+          <h2 className="mt-2 font-display text-xl font-semibold">{insight.headline}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-foreground/85">{insight.body}</p>
+          {insight.suggestions.length > 0 && (
+            <ul className="mt-4 grid gap-2 md:grid-cols-2">
+              {insight.suggestions.map((s) => (
+                <li key={s} className="flex gap-2 rounded-2xl bg-card/80 px-4 py-3 text-sm">
+                  <span>🌱</span>
+                  <span className="leading-relaxed">{s}</span>
                 </li>
               ))}
             </ul>
           )}
-        </section>
-      </div>
-
-      {breakdown.length > 0 && (
-        <section className="card-soft px-6 py-6 sm:px-8">
-          <h2 className="font-display text-lg font-semibold">触发因素对应的情绪分布</h2>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            每一条代表这个标签下，各种情绪出现的比例。
-          </p>
-          <ul className="mt-6 space-y-5">
-            {breakdown.map((b) => (
-              <li key={b.key}>
-                <div className="flex items-baseline justify-between text-sm">
-                  <span className="font-medium">{b.label}</span>
-                  <span className="text-xs text-muted-foreground">{b.count} 条记录</span>
-                </div>
-                <div className="mt-2 flex h-3 overflow-hidden rounded-full bg-secondary">
-                  {b.segments.map((s) => (
-                    <span
-                      key={s.mood.key}
-                      title={`${s.mood.label} ${s.percent}%`}
-                      style={{ width: `${s.percent}%`, backgroundColor: s.mood.color }}
-                    />
+          {insight.evidence.length > 0 && (
+            <>
+              <button
+                onClick={() => setEvidenceOpen((v) => !v)}
+                aria-expanded={evidenceOpen}
+                className="mt-3 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                为什么这样说？
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${evidenceOpen ? "rotate-180" : ""}`} />
+              </button>
+              {evidenceOpen && (
+                <ul className="mt-2 space-y-1.5 border-l-2 border-primary/40 pl-3 text-xs leading-relaxed text-foreground/80">
+                  {insight.evidence.map((ev) => (
+                    <li key={ev}>{ev}</li>
                   ))}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  {b.segments.map((s) => (
-                    <span key={s.mood.key} className="flex items-center gap-1">
-                      <span
-                        className="inline-block h-2 w-2 rounded-full"
-                        style={{ backgroundColor: s.mood.color }}
-                      />
-                      {s.mood.label} {s.percent}%
-                    </span>
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
+                </ul>
+              )}
+            </>
+          )}
+          <p className="mt-4 text-xs text-muted-foreground">由你的记录按规则整理，仅供自我觉察参考，并非医学诊断。</p>
         </section>
       )}
 
-      <section className="card-soft px-6 py-6 sm:px-8">
-        <h2 className="font-display text-lg font-semibold">在做什么的时候，感受如何</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          按记录时选的「此刻在做什么」分组，看看哪些场景让你更舒展、哪些更消耗。
-        </p>
-        {scenes.length === 0 ? (
-          <p className="mt-5 text-sm text-muted-foreground">
-            记录时选一下「此刻在做什么」，这里会显示不同场景下的感受。
-          </p>
-        ) : (
-          <>
-            <ul className="mt-6 space-y-4">
-              {scenes.map((sc) => (
-                <li key={sc.key}>
-                  <div className="flex items-baseline justify-between text-sm">
-                    <span>
-                      {sc.emoji} {sc.label}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{sc.count} 条记录</span>
-                  </div>
-                  <div
-                    className="mt-2 flex h-3 overflow-hidden rounded-full bg-secondary"
-                    title={`舒展 ${sc.bright} · 一般 ${sc.neutral} · 偏消耗 ${sc.heavy}`}
-                  >
-                    <span style={{ width: `${(sc.bright / sc.count) * 100}%`, backgroundColor: "var(--mood-calm)" }} />
-                    <span style={{ width: `${(sc.neutral / sc.count) * 100}%`, backgroundColor: "var(--mood-neutral)" }} />
-                    <span style={{ width: `${(sc.heavy / sc.count) * 100}%`, backgroundColor: "var(--mood-anxious)" }} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              {[
-                ["舒展", "var(--mood-calm)"],
-                ["一般", "var(--mood-neutral)"],
-                ["偏消耗", "var(--mood-anxious)"],
-              ].map(([label, color]) => (
-                <span key={label} className="flex items-center gap-1">
-                  <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-                  {label}
-                </span>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
+      <div className="sticky top-[4.5rem] z-20 rounded-full backdrop-blur-xl">
+        <Segmented items={TABS} value={tab} onChange={pick} label="洞察分类" />
+      </div>
 
-      <section className="card-soft px-6 py-6 sm:px-8">
-        <h2 className="font-display text-lg font-semibold">身体和情绪</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          把每天的睡眠、活动量和当天的记录放在一起看。数据来自首页的一键记录或快捷指令同步。
-        </p>
-        {body.sleep.every((b) => b.days === 0) && body.activity.every((b) => b.days === 0) ? (
-          <p className="mt-5 text-sm text-muted-foreground">
-            在首页记一下昨晚睡得怎么样、今天动得多不多，这里会显示它们和心情的关系。
-          </p>
-        ) : (
-          <div className="mt-6 grid gap-6 md:grid-cols-2">
-            <BodyBlock title="睡眠" buckets={body.sleep} />
-            <BodyBlock title="活动量" buckets={body.activity} />
-          </div>
-        )}
-      </section>
+      {/* ---------- 情绪趋势 ---------- */}
+      {tab === "trend" && (
+        <div className="animate-rise space-y-4" role="tabpanel">
+          <SectionCard title="最近 7 天" desc="线条越高，代表当天记录里的感受越轻松；空缺表示那天没有记录。">
+            <TrendChart points={points} />
+          </SectionCard>
 
-      <CycleCard />
-
-      <section className="card-soft px-6 py-6 sm:px-8">
-        <h2 className="font-display text-lg font-semibold">你的情绪歌单</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">来自记录时填写的「此刻在听什么」。</p>
-        {playlist.bright.length === 0 && playlist.heavy.length === 0 ? (
-          <p className="mt-5 text-sm text-muted-foreground">
-            记录时填一下「此刻在听什么」，这里会整理出你的情绪歌单。
-          </p>
-        ) : (
-          <div className="mt-5 grid gap-5 md:grid-cols-2">
-            {(
-              [
-                ["让你舒展的歌", playlist.bright],
-                ["陪你度过难受时刻的歌", playlist.heavy],
-              ] as const
-            ).map(([title, list]) => (
-              <div key={title}>
-                <h3 className="text-sm font-medium">{title}</h3>
-                {list.length === 0 ? (
-                  <p className="mt-2 text-xs text-muted-foreground">还没有</p>
-                ) : (
-                  <ul className="mt-2 space-y-2">
-                    {list.map((sg) => (
-                      <li key={`${sg.title}|${sg.artist ?? ""}`} className="flex items-center justify-between gap-2 rounded-2xl bg-secondary/50 px-4 py-2.5 text-sm">
-                        <span className="min-w-0 truncate">
-                          🎵《{sg.title}》{sg.artist ? ` · ${sg.artist}` : ""}
-                        </span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {sg.count > 1 ? `${sg.count} 次` : ""}
-                          {sg.sampleOnly ? " 示例" : ""}
-                          {sg.url && (
-                            <a href={sg.url} target="_blank" rel="noopener noreferrer" className="ml-2 underline underline-offset-2">
-                              去听
-                            </a>
-                          )}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="card-soft px-6 py-6 sm:px-8">
-        <h2 className="font-display text-lg font-semibold">一天里的情绪强度</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">按记录时间分成四个时段的平均强度。</p>
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {slots.map((s) => (
-            <div key={s.key} className="rounded-2xl bg-secondary/50 px-4 py-4 text-center">
-              <p className="text-xl">{s.emoji}</p>
-              <p className="mt-1 text-sm">{s.label}</p>
-              <p className="mt-2 font-display text-2xl font-medium">
-                {s.avg === null ? "—" : s.avg}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {s.count === 0 ? "暂无记录" : `${s.count} 条 · 平均强度`}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-
-      <section className="card-soft px-6 py-6 sm:px-8">
-        <h2 className="font-display text-lg font-semibold">什么对我有效</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          在紧绷或低落时做完调节、又评了一次分的记录。下降越多，说明这个方法对你越有帮助。
-        </p>
-        {methods.length === 0 ? (
-          <p className="mt-5 text-sm text-muted-foreground">
-            下次做完呼吸练习后评一下现在的感受，这里会告诉你哪种方法对你更有效。
-          </p>
-        ) : (
-          <ul className="mt-5 space-y-3">
-            {methods.map((m, i) => (
-              <li
-                key={m.label}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-secondary/50 px-4 py-3.5"
-              >
-                <div>
-                  <p className="text-sm font-medium">
-                    {m.method === "breathing" ? "🫁" : "🌿"} {m.label}
-                    {i === 0 && m.avgDrop >= 1 && (
-                      <span className="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-normal">
-                        目前最有效
+          <div className="grid gap-4 md:grid-cols-2">
+            <SectionCard title="高频情绪">
+              <ul className="space-y-4">
+                {dist.slice(0, 5).map((d) => (
+                  <li key={d.mood.key}>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>
+                        {d.mood.emoji} {d.mood.label}
                       </span>
-                    )}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    做了 {m.count} 次 · 平均 {m.avgBefore} → {m.avgAfter}
-                    {m.sampleOnly ? " · 示例数据" : ""}
-                    {m.count < 3 ? " · 记录还不多，仅供参考" : ""}
-                  </p>
-                </div>
-                <span className="font-display text-lg tabular-nums">
-                  {m.avgDrop > 0 ? `↓ ${m.avgDrop}` : m.avgDrop < 0 ? `↑ ${-m.avgDrop}` : "—"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                      <span className="text-muted-foreground">{d.percent}%</span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
+                      <div className="h-full rounded-full" style={{ width: `${d.percent}%`, backgroundColor: d.mood.color }} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
 
-      <section className="rounded-3xl border border-border bg-primary-soft/70 px-6 py-7 shadow-[var(--shadow-soft)] sm:px-8">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Sparkles className="h-4 w-4" />
-          从你的记录来看
+            <SectionCard title="一天里的情绪强度" desc="按记录时间分成四个时段的平均强度。">
+              <div className="grid grid-cols-2 gap-2.5">
+                {slots.map((s) => (
+                  <div key={s.key} className="rounded-2xl bg-secondary/50 px-3 py-3 text-center">
+                    <p className="text-sm">
+                      {s.emoji} {s.label}
+                    </p>
+                    <p className="mt-1 font-display text-2xl font-medium">{s.avg === null ? "—" : s.avg}</p>
+                    <p className="text-xs text-muted-foreground">{s.count === 0 ? "暂无记录" : `${s.count} 条`}</p>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          </div>
         </div>
-        <h2 className="mt-3 font-display text-xl font-semibold">{insight.headline}</h2>
-        <p className="mt-3 text-sm leading-relaxed text-foreground/85">{insight.body}</p>
-        {insight.evidence.length > 0 && (
-          <>
-            <button
-              onClick={() => setEvidenceOpen((v) => !v)}
-              aria-expanded={evidenceOpen}
-              className="mt-3 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              为什么这样说？
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${evidenceOpen ? "rotate-180" : ""}`} />
-            </button>
-            {evidenceOpen && (
-              <ul className="mt-2 space-y-1.5 border-l-2 border-primary/40 pl-3 text-xs leading-relaxed text-foreground/80">
-                {insight.evidence.map((ev) => (
-                  <li key={ev}>{ev}</li>
+      )}
+
+      {/* ---------- 原因与场景 ---------- */}
+      {tab === "causes" && (
+        <div className="animate-rise space-y-4" role="tabpanel">
+          <SectionCard title="常见的触发因素" desc="记录时选的「和什么有关」，按出现次数排序。">
+            {triggers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">记录时勾选触发因素标签，这里就会出现排行。</p>
+            ) : (
+              <ul className="space-y-3">
+                {triggers.slice(0, 6).map((t) => (
+                  <li key={t.key} className="flex items-center gap-3">
+                    <span className="w-24 shrink-0 text-sm">{t.label}</span>
+                    <span className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                      <span className="block h-full rounded-full bg-foreground/25" style={{ width: `${Math.max(12, t.ratio * 100)}%` }} />
+                    </span>
+                    <span className="w-10 text-right text-xs text-muted-foreground">{t.count} 次</span>
+                  </li>
                 ))}
               </ul>
             )}
-          </>
-        )}
-        <ul className="mt-5 space-y-2">
-          {insight.suggestions.map((s) => (
-            <li key={s} className="flex gap-2 rounded-2xl bg-card/80 px-4 py-3 text-sm">
-              <span>🌱</span>
-              <span className="leading-relaxed">{s}</span>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-5 text-xs text-muted-foreground">
-          以上内容由你的记录自动整理，仅供自我觉察参考，并非医学诊断。
-        </p>
-      </section>
+          </SectionCard>
+
+          {breakdown.length > 0 && (
+            <SectionCard title="每个触发因素下的情绪" desc="每一条代表这个标签下，各种情绪出现的比例。">
+              <ul className="space-y-5">
+                {breakdown.map((b) => (
+                  <li key={b.key}>
+                    <div className="flex items-baseline justify-between text-sm">
+                      <span className="font-medium">{b.label}</span>
+                      <span className="text-xs text-muted-foreground">{b.count} 条记录</span>
+                    </div>
+                    <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-secondary">
+                      {b.segments.map((s) => (
+                        <span
+                          key={s.mood.key}
+                          title={`${s.mood.label} ${s.percent}%`}
+                          style={{ width: `${s.percent}%`, backgroundColor: s.mood.color }}
+                        />
+                      ))}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      {b.segments.map((s) => (
+                        <span key={s.mood.key} className="flex items-center gap-1">
+                          <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: s.mood.color }} />
+                          {s.mood.label} {s.percent}%
+                        </span>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
+          )}
+
+          <SectionCard
+            title="在做什么的时候，感受如何"
+            desc="按记录时选的「此刻在做什么」分组，看看哪些场景让你更舒展、哪些更消耗。"
+          >
+            {scenes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">记录时选一下「此刻在做什么」，这里会显示不同场景下的感受。</p>
+            ) : (
+              <>
+                <ul className="space-y-4">
+                  {scenes.map((sc) => (
+                    <li key={sc.key}>
+                      <div className="flex items-baseline justify-between text-sm">
+                        <span>
+                          {sc.emoji} {sc.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{sc.count} 条记录</span>
+                      </div>
+                      <ValenceBar className="mt-2" bright={sc.bright} neutral={sc.neutral} heavy={sc.heavy} />
+                    </li>
+                  ))}
+                </ul>
+                <ValenceLegend className="mt-4" />
+              </>
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {/* ---------- 身体与周期 ---------- */}
+      {tab === "body" && (
+        <div className="animate-rise space-y-4" role="tabpanel">
+          <SectionCard title="睡眠、活动和情绪" desc="把每天的睡眠、活动量和当天的记录放在一起看。数据来自首页的一键记录或快捷指令同步。">
+            {body.sleep.every((b) => b.days === 0) && body.activity.every((b) => b.days === 0) ? (
+              <p className="text-sm text-muted-foreground">在首页记一下昨晚睡得怎么样、今天动得多不多，这里会显示它们和心情的关系。</p>
+            ) : (
+              <>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <BodyBlock title="睡眠" buckets={body.sleep} />
+                  <BodyBlock title="活动量" buckets={body.activity} />
+                </div>
+                <ValenceLegend className="mt-4" />
+              </>
+            )}
+          </SectionCard>
+          <CycleCard />
+        </div>
+      )}
+
+      {/* ---------- 什么对我有效 ---------- */}
+      {tab === "works" && (
+        <div className="animate-rise space-y-4" role="tabpanel">
+          <SectionCard
+            title="什么对我有效"
+            desc="在紧绷或低落时做完调节、又评了一次分的记录。下降越多，说明这个方法对你越有帮助。"
+            action={
+              <Link to="/care" className="shrink-0 text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
+                去关怀页试试
+              </Link>
+            }
+          >
+            {methods.length === 0 ? (
+              <p className="text-sm text-muted-foreground">下次做完呼吸练习后评一下现在的感受，这里会告诉你哪种方法对你更有效。</p>
+            ) : (
+              <ul className="space-y-2.5">
+                {methods.map((m, i) => (
+                  <li key={m.label} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-secondary/50 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {m.method === "breathing" ? "🫁" : "🌿"} {m.label}
+                        {i === 0 && m.avgDrop >= 1 && (
+                          <span className="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-normal">目前最有效</span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        做了 {m.count} 次 · 平均 {m.avgBefore} → {m.avgAfter}
+                        {m.sampleOnly ? " · 示例数据" : ""}
+                        {m.count < 3 ? " · 记录还不多，仅供参考" : ""}
+                      </p>
+                    </div>
+                    <span className="font-display text-lg tabular-nums">
+                      {m.avgDrop > 0 ? `↓ ${m.avgDrop}` : m.avgDrop < 0 ? `↑ ${-m.avgDrop}` : "—"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+
+          <SectionCard title="你的情绪歌单" desc="来自记录时填写的「此刻在听什么」。">
+            {playlist.bright.length === 0 && playlist.heavy.length === 0 ? (
+              <p className="text-sm text-muted-foreground">记录时填一下「此刻在听什么」，这里会整理出你的情绪歌单。</p>
+            ) : (
+              <div className="grid gap-5 md:grid-cols-2">
+                {(
+                  [
+                    ["让你舒展的歌", playlist.bright],
+                    ["陪你度过难受时刻的歌", playlist.heavy],
+                  ] as const
+                ).map(([title, list]) => (
+                  <div key={title}>
+                    <h3 className="text-sm font-medium">{title}</h3>
+                    {list.length === 0 ? (
+                      <p className="mt-2 text-xs text-muted-foreground">还没有</p>
+                    ) : (
+                      <ul className="mt-2 space-y-2">
+                        {list.map((sg) => (
+                          <li
+                            key={`${sg.title}|${sg.artist ?? ""}`}
+                            className="flex items-center justify-between gap-2 rounded-2xl bg-secondary/50 px-4 py-2.5 text-sm"
+                          >
+                            <span className="min-w-0 truncate">
+                              🎵《{sg.title}》{sg.artist ? ` · ${sg.artist}` : ""}
+                            </span>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {sg.count > 1 ? `${sg.count} 次` : ""}
+                              {sg.sampleOnly ? " 示例" : ""}
+                              {sg.url && (
+                                <a href={sg.url} target="_blank" rel="noopener noreferrer" className="ml-2 underline underline-offset-2">
+                                  去听
+                                </a>
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+      )}
     </div>
   );
 }
@@ -469,18 +459,7 @@ function BodyBlock({ title, buckets }: { title: string; buckets: BodyBucket[] })
                 {b.days} 天 · {b.records} 条记录
               </span>
             </div>
-            <div
-              className="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-secondary"
-              title={`舒展 ${b.bright} · 一般 ${b.neutral} · 偏消耗 ${b.heavy}`}
-            >
-              {b.records > 0 && (
-                <>
-                  <span style={{ width: `${(b.bright / b.records) * 100}%`, backgroundColor: "var(--mood-calm)" }} />
-                  <span style={{ width: `${(b.neutral / b.records) * 100}%`, backgroundColor: "var(--mood-neutral)" }} />
-                  <span style={{ width: `${(b.heavy / b.records) * 100}%`, backgroundColor: "var(--mood-anxious)" }} />
-                </>
-              )}
-            </div>
+            <ValenceBar className="mt-1.5" bright={b.bright} neutral={b.neutral} heavy={b.heavy} />
           </li>
         ))}
       </ul>
