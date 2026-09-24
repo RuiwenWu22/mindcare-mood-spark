@@ -9,12 +9,14 @@ import {
   activityOf,
   isSample,
   moodOf,
+  sortByNewest,
   triggerLabel,
   type ActivityKey,
   type Entry,
   type MoodKey,
 } from "@/lib/mood";
 import type { AmbientId } from "@/lib/ambient";
+import type { Song } from "@/lib/songs";
 
 export type BreathPhase = { name: string; seconds: number; scale: number };
 
@@ -83,6 +85,8 @@ export type CareRecommendation = {
   breathing: BreathingPlan;
   music: { id: AmbientId; reason: string };
   move: { title: string; desc: string };
+  /** 备选：你在心情舒展时听过的歌（来自你自己的记录） */
+  song?: Song & { sampleOnly: boolean };
   /** 为什么推荐这个：每一条都来自真实数据或明确的规则 */
   why: string[];
   encouragement: string;
@@ -169,7 +173,12 @@ export function buildRecommendation(entry: Entry, history: Entry[] = []): CareRe
   }
   let personal: PlanHistory | null = null;
   if (group !== "bright") {
-    const best = breathingHistory(history).find((h) => h.avgDrop >= 1);
+    // 你自己的调节效果优先；自己试过但没帮助的方法，不会因为示例数据而被推荐
+    const own = breathingHistory(history.filter((h) => !isSample(h)));
+    const tried = new Set(own.map((h) => h.plan.key));
+    const best =
+      own.find((h) => h.avgDrop >= 1) ??
+      breathingHistory(history.filter(isSample)).find((h) => h.avgDrop >= 1 && !tried.has(h.plan.key));
     if (best) {
       personal = best;
       planKey = best.plan.key;
@@ -229,5 +238,14 @@ export function buildRecommendation(entry: Entry, history: Entry[] = []): CareRe
         ? "难过来的时候，先陪着它，而不是赶走它。"
         : "记下此刻具体发生了什么，之后状态低的时候可以回来看看。";
 
-  return { group, primary, intro, breathing, music, move, why, encouragement };
+  // 紧绷或低落时，把你自己舒展时听过的歌作为备选
+  let song: CareRecommendation["song"];
+  if (group !== "bright") {
+    const withSong = sortByNewest(history).filter((h) => h.song && moodOf(h.mood).valence === 1);
+    // 你自己的歌永远优先于示例数据，不管时间先后
+    const e = withSong.find((h) => !isSample(h)) ?? withSong[0];
+    if (e?.song) song = { ...e.song, sampleOnly: isSample(e) };
+  }
+
+  return { group, primary, intro, breathing, music, move, ...(song ? { song } : {}), why, encouragement };
 }

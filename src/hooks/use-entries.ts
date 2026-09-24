@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { clearBody, clearSampleBody, restoreSampleBody } from "@/lib/body";
+import type { Song } from "@/lib/songs";
 import {
   loadEntries,
   saveEntries,
@@ -45,6 +47,7 @@ export function useEntries() {
       note: string;
       triggers?: TriggerKey[];
       activity?: ActivityKey | null;
+      song?: Song | null;
     }) => {
       const auto = detectTriggers(input.note);
       const triggers = Array.from(new Set([...(input.triggers ?? []), ...auto]));
@@ -56,6 +59,7 @@ export function useEntries() {
         note: input.note.trim(),
         triggers,
         ...(input.activity ? { activity: input.activity } : {}),
+        ...(input.song?.title ? { song: input.song } : {}),
       };
       commit([entry, ...loadEntries()]);
       return entry;
@@ -69,10 +73,10 @@ export function useEntries() {
   );
 
   /** 清空示例数据，只保留用户自己的记录（之后不会再自动填入示例） */
-  const clearSamples = useCallback(
-    () => commit(loadEntries().filter((e) => !isSample(e))),
-    [commit],
-  );
+  const clearSamples = useCallback(() => {
+    commit(loadEntries().filter((e) => !isSample(e)));
+    clearSampleBody();
+  }, [commit]);
 
   const addFollowUp = useCallback(
     (id: string, followUp: FollowUp) =>
@@ -85,13 +89,16 @@ export function useEntries() {
   );
 
   /** 删除全部记录（包括示例），之后不会再自动填入示例 */
-  const clearAll = useCallback(() => commit([]), [commit]);
+  const clearAll = useCallback(() => {
+    commit([]);
+    clearBody();
+  }, [commit]);
 
   /** 重新载入示例数据，保留用户自己的记录 */
-  const restoreSamples = useCallback(
-    () => commit([...loadEntries().filter((e) => !isSample(e)), ...seedEntries()]),
-    [commit],
-  );
+  const restoreSamples = useCallback(() => {
+    commit([...loadEntries().filter((e) => !isSample(e)), ...seedEntries()]);
+    restoreSampleBody();
+  }, [commit]);
 
   return {
     entries,

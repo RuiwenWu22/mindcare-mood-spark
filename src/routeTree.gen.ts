@@ -14,6 +14,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as CareRouteImport } from './routes/care'
 import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as JournalRouteImport } from './routes/journal'
+import { Route as SyncRouteImport } from './routes/sync'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +41,11 @@ const JournalRoute = JournalRouteImport.update({
   path: '/journal',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SyncRoute = SyncRouteImport.update({
+  id: '/sync',
+  path: '/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/care': typeof CareRoute
   '/insights': typeof InsightsRoute
   '/journal': typeof JournalRoute
+  '/sync': typeof SyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/care': typeof CareRoute
   '/insights': typeof InsightsRoute
   '/journal': typeof JournalRoute
+  '/sync': typeof SyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,14 @@ export interface FileRoutesById {
   '/care': typeof CareRoute
   '/insights': typeof InsightsRoute
   '/journal': typeof JournalRoute
+  '/sync': typeof SyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/care' | '/insights' | '/journal'
+  fullPaths: '/' | '/about' | '/care' | '/insights' | '/journal' | '/sync'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/care' | '/insights' | '/journal'
-  id: '__root__' | '/' | '/about' | '/care' | '/insights' | '/journal'
+  to: '/' | '/about' | '/care' | '/insights' | '/journal' | '/sync'
+  id: '__root__' | '/' | '/about' | '/care' | '/insights' | '/journal' | '/sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +86,7 @@ export interface RootRouteChildren {
   CareRoute: typeof CareRoute
   InsightsRoute: typeof InsightsRoute
   JournalRoute: typeof JournalRoute
+  SyncRoute: typeof SyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -116,6 +126,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JournalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sync': {
+      id: '/sync'
+      path: '/sync'
+      fullPath: '/sync'
+      preLoaderRoute: typeof SyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -125,6 +142,7 @@ const rootRouteChildren: RootRouteChildren = {
   CareRoute: CareRoute,
   InsightsRoute: InsightsRoute,
   JournalRoute: JournalRoute,
+  SyncRoute: SyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

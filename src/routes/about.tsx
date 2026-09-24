@@ -4,6 +4,7 @@ import { Download, Phone, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useEntries } from "@/hooks/use-entries";
 import { downloadCsv, isSample } from "@/lib/mood";
+import { csvDayInfo, loadBody } from "@/lib/body";
 import { HOTLINE } from "@/lib/safety";
 
 export const Route = createFileRoute("/about")({
@@ -33,6 +34,14 @@ const DECISIONS: [string, string][] = [
   ["记录后只给一个首选", "紧绷或低落时先照顾身体（呼吸），舒展时延续状态（背景声），并说明为什么推荐。"],
   ["做完再评一次", "记下调节前后的强度，用你自己的数据验证什么方法有效。"],
   ["洞察附带依据", "每条结论都能展开，看到它来自哪些记录。"],
+  [
+    "把身体数据放进来",
+    "借鉴健康 App：睡眠和活动量是影响情绪的重要因素。首页一键记录，也可以用 iPhone 快捷指令同步步数和锻炼时间。",
+  ],
+  [
+    "此刻的 BGM",
+    "听歌是年轻人最常见的调节方式之一。只记录你主动分享的歌，不读取听歌记录，也不从歌推断心情。",
+  ],
   [
     "场景维度借鉴微信状态",
     "年轻人描述自己时，常说“在搬砖”“在刷手机”，而不只是“我很焦虑”。知道在做什么时更轻松、什么时更消耗，比只看情绪更有用。",
@@ -121,6 +130,7 @@ function AboutPage() {
             · 以微信小程序形式落地：目标用户每天都在微信里，免安装能进一步降低门槛。在用户同意后通过订阅消息发送温和提醒，频率由用户决定，不做连续打卡式的施压。
           </li>
           <li>· 按上面的方式接入大模型，并带上护栏。</li>
+          <li>· 连接 Apple Music：记录时从最近播放里点选正在听的歌，由你确认，而不是自动推断。</li>
           <li>· 让背景声和轻运动也能记录前后变化，让“什么对我有效”覆盖更多方法。</li>
           <li>· 可选的跨设备同步，只在用户明确同意后开启。</li>
         </ul>
@@ -133,13 +143,13 @@ function AboutPage() {
           <div>
             <dt className="font-medium">你的记录存在哪里</dt>
             <dd className="mt-1 text-foreground/80">
-              只保存在这台设备的浏览器里。换设备或换浏览器看不到；清除浏览器数据会一起删除。
+              情绪记录、睡眠、活动数据和你填写的歌曲，都只保存在这台设备的浏览器里。换设备或换浏览器看不到；清除浏览器数据会一起删除。
             </dd>
           </div>
           <div>
             <dt className="font-medium">会不会上传</dt>
             <dd className="mt-1 text-foreground/80">
-              本应用不会把你的记录内容发送到任何服务器。网站托管平台可能会统计访问情况，比如页面被打开的次数；页面出错时可能上报错误描述和页面路径。这些都不包含你的记录内容。页面字体从 Google Fonts 加载。
+              本应用不会把你的记录内容发送到任何服务器。用快捷指令同步时，数据放在链接的 # 后面，浏览器不会把这部分发送给服务器，MindCare 读取后会立即从地址栏清除。网站托管平台可能会统计访问情况，比如页面被打开的次数；页面出错时可能上报错误描述和页面路径。这些都不包含你的记录内容。页面字体从 Google Fonts 加载。
             </dd>
           </div>
           <div>
@@ -157,7 +167,7 @@ function AboutPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               onClick={() => {
-                downloadCsv(entries);
+                downloadCsv(entries, csvDayInfo(loadBody()));
                 toast("情绪记录已导出为 CSV 🌿");
               }}
               disabled={!ready || entries.length === 0}

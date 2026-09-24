@@ -6,6 +6,7 @@ import { MoodComposer } from "@/components/mood-composer";
 import { SampleNotice } from "@/components/sample-notice";
 import { useEntries } from "@/hooks/use-entries";
 import { activityOf, downloadCsv, formatDate, isSample, moodOf, triggerLabel } from "@/lib/mood";
+import { csvDayInfo, loadBody } from "@/lib/body";
 
 export const Route = createFileRoute("/journal")({
   head: () => ({
@@ -40,7 +41,7 @@ function JournalPage() {
                 toast("还没有可以导出的记录");
                 return;
               }
-              downloadCsv(entries);
+              downloadCsv(entries, csvDayInfo(loadBody()));
               toast("情绪记录已导出为 CSV 🌿");
             }}
             disabled={!ready || entries.length === 0}
@@ -103,6 +104,23 @@ function JournalPage() {
                   {e.note && (
                     <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
                       {e.note}
+                    </p>
+                  )}
+                  {e.song && (
+                    <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span>
+                        🎵《{e.song.title}》{e.song.artist ? ` · ${e.song.artist}` : ""}
+                      </span>
+                      {e.song.url && (
+                        <a
+                          href={e.song.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-2 hover:text-foreground"
+                        >
+                          去听
+                        </a>
+                      )}
                     </p>
                   )}
                   {(e.followUps ?? []).map((f) => (

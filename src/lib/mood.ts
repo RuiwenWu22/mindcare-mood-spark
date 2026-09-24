@@ -1,4 +1,5 @@
 import { hasCrisisSignal, HOTLINE } from "@/lib/safety";
+import { sanitizeSong, songKey, type Song } from "@/lib/songs";
 
 /**
  * MindCare 核心数据层
@@ -136,6 +137,8 @@ export type Entry = {
   triggers: TriggerKey[];
   /** 记录时在做什么（可选） */
   activity?: ActivityKey;
+  /** 此刻的 BGM（可选，由用户主动填写） */
+  song?: Song;
   /** 示例数据：首次打开时自动填入，界面上会明确标注 */
   sample?: boolean;
   followUps?: FollowUp[];
@@ -160,6 +163,12 @@ function normalizeTriggers(triggers: string[]): TriggerKey[] {
 }
 
 const STORAGE_KEY = "mindcare.entries.v1";
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+/** 本地日期键 YYYY-MM-DD，用来把记录和当天的睡眠、活动数据对上 */
+export const dayKey = (d: Date = new Date()) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+export const entryDay = (e: Entry) => dayKey(new Date(e.createdAt));
 
 /** 从文字里推测触发因素 */
 export function detectTriggers(note: string): TriggerKey[] {
@@ -188,6 +197,7 @@ export function seedEntries(): Entry[] {
     {
       id: "seed-1",
       sample: true,
+      song: { title: "晴天", artist: "周杰伦" },
       createdAt: daysAgo(0, 9),
       mood: "calm",
       intensity: 6,
@@ -198,6 +208,7 @@ export function seedEntries(): Entry[] {
     {
       id: "seed-2",
       sample: true,
+      song: { title: "夜空中最亮的星", artist: "逃跑计划" },
       createdAt: daysAgo(1, 22),
       mood: "anxious",
       intensity: 8,
@@ -220,6 +231,7 @@ export function seedEntries(): Entry[] {
     {
       id: "seed-6",
       sample: true,
+      song: { title: "倔强", artist: "五月天" },
       createdAt: daysAgo(3, 19),
       mood: "happy",
       intensity: 7,
@@ -240,6 +252,7 @@ export function seedEntries(): Entry[] {
     {
       id: "seed-4",
       sample: true,
+      song: { title: "稳稳的幸福", artist: "陈奕迅" },
       createdAt: daysAgo(4, 19),
       mood: "happy",
       intensity: 7,
@@ -250,6 +263,7 @@ export function seedEntries(): Entry[] {
     {
       id: "seed-5",
       sample: true,
+      song: { title: "后来", artist: "刘若英" },
       createdAt: daysAgo(5, 23),
       mood: "sad",
       intensity: 5,
@@ -283,9 +297,11 @@ export function loadEntries(): Entry[] {
     const parsed = JSON.parse(raw) as Entry[];
     if (!Array.isArray(parsed)) return [];
     return parsed.map((e) => {
-      const { activity, ...rest } = e;
+      const { activity, song, ...rest } = e;
       const clean: Entry = { ...rest, triggers: normalizeTriggers(e.triggers ?? []) };
       if (activity && ACTIVITY_KEYS.has(activity)) clean.activity = activity;
+      const safeSong = sanitizeSong(song);
+      if (safeSong) clean.song = safeSong;
       return clean;
     });
   } catch {
@@ -306,7 +322,10 @@ export const sortByNewest = (entries: Entry[]) =>
 const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
 
 /** 把记录转成带 BOM 的 CSV 文本（Excel 打开中文不乱码） */
-export function entriesToCsv(entries: Entry[]): string {
+/** 导出时附带的当天身体数据（由调用方从身体数据模块整理后传入） */
+export type CsvDayInfo = Record<string, { sleep?: string; steps?: number }>;
+
+export function entriesToCsv(entries: Entry[], dayInfo: CsvDayInfo = {}): string {
   const header = [
     "记录时间",
     "情绪",
@@ -314,6 +333,9 @@ export function entriesToCsv(entries: Entry[]): string {
     "心情笔记",
     "触发因素",
     "在做什么",
+    "此刻的BGM",
+    "当天睡眠",
+    "当天步数",
     "调节记录",
     "备注",
   ];
@@ -329,6 +351,9 @@ export function entriesToCsv(entries: Entry[]): string {
       e.note,
       e.triggers.map(triggerLabel).join("、"),
       e.activity ? activityOf(e.activity).label : "",
+      e.song ? `《${e.song.title}》${e.song.artist ? ` ${e.song.artist}` : ""}` : "",
+      dayInfo[entryDay(e)]?.sleep ?? "",
+      String(dayInfo[entryDay(e)]?.steps ?? ""),
       (e.followUps ?? []).map((f) => `${f.label}后 ${f.before}→${f.after}`).join("；"),
       isSample(e) ? "示例数据" : "",
     ];
@@ -338,9 +363,9 @@ export function entriesToCsv(entries: Entry[]): string {
 }
 
 /** 触发浏览器下载 */
-export function downloadCsv(entries: Entry[]) {
+export function downloadCsv(entries: Entry[], dayInfo: CsvDayInfo = {}) {
   if (typeof window === "undefined" || entries.length === 0) return;
-  const blob = new Blob([entriesToCsv(entries)], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob([entriesToCsv(entries, dayInfo)], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   const now = new Date();
@@ -535,7 +560,32 @@ export function activityStats(entries: Entry[]): ActivityStat[] {
     .sort((a, b) => b.count - a.count);
 }
 
+/* ---------------- 情绪歌单 ---------------- */
+
+export type SongStat = Song & { count: number; sampleOnly: boolean };
+
+/** 按记录时的情绪，把歌分成"让你舒展的"和"陪你度过难受时刻的" */
+export function songsByMood(entries: Entry[]): { bright: SongStat[]; heavy: SongStat[] } {
+  const collect = (valence: number) => {
+    const acc = new Map<string, SongStat>();
+    for (const e of sortByNewest(entries)) {
+      if (!e.song || moodOf(e.mood).valence !== valence) continue;
+      const k = songKey(e.song);
+      const cur = acc.get(k);
+      if (cur) {
+        cur.count += 1;
+        if (!isSample(e)) cur.sampleOnly = false;
+      } else acc.set(k, { ...e.song, count: 1, sampleOnly: isSample(e) });
+    }
+    return [...acc.values()].sort((a, b) => b.count - a.count);
+  };
+  return { bright: collect(1), heavy: collect(-1) };
+}
+
 /* ---------------- 规则版分析（每条结论都附依据） ---------------- */
+
+/** 其他模块（例如睡眠和活动）得出的发现，合并进总结里，同样附带依据 */
+export type ExtraFindings = { sentences: string[]; evidence: string[]; suggestions: string[] };
 
 export type Insight = {
   headline: string;
@@ -551,7 +601,7 @@ const slotRange = (from: number, to: number) => `${from}–${to} 点`;
  * 纯前端规则生成的温和分析，每一句结论都能在 evidence 里找到对应的统计。
  * 之后接入大模型时，只需把这个函数换成服务端调用，返回同样的 Insight 结构。
  */
-export function analyzeEntries(entries: Entry[]): Insight {
+export function analyzeEntries(entries: Entry[], extra?: ExtraFindings): Insight {
   if (entries.length === 0) {
     return {
       headline: "还没有足够的记录",
@@ -624,6 +674,11 @@ export function analyzeEntries(entries: Entry[]): Insight {
     evidence.push(`场景为「${brightScene.label}」的 ${brightScene.count} 条记录里，${brightScene.bright} 条是舒展的。`);
   }
 
+  if (extra) {
+    parts.push(...extra.sentences);
+    evidence.push(...extra.evidence);
+  }
+
   const samples = recent.filter(isSample).length;
   if (samples > 0) evidence.push(`其中 ${samples} 条是示例记录。`);
 
@@ -639,6 +694,7 @@ export function analyzeEntries(entries: Entry[]): Insight {
       `下次感到紧绷或低落时，可以先试试「${best.label}」：${best.sampleOnly ? "在示例记录里" : "在你的记录里"}，它平均让强度下降 ${best.avgDrop}。`,
     );
   }
+  if (extra) suggestions.push(...extra.suggestions);
   if (heavyScene?.key === "bed")
     suggestions.push("睡前容易想太多时，可以试试 4-7-8 呼吸，或者先把脑子里的事写下来再睡。");
   if (heavyScene?.key === "scroll")

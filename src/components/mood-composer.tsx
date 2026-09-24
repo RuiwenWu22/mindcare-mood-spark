@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   ACTIVITIES,
@@ -11,6 +11,7 @@ import {
   type TriggerKey,
 } from "@/lib/mood";
 import { assessRisk, type Risk } from "@/lib/safety";
+import { parseSongInput, PLATFORM_LABEL } from "@/lib/songs";
 import { RecommendationPanel } from "@/components/recommendation-panel";
 import { useEntries } from "@/hooks/use-entries";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,8 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
   const [activity, setActivity] = useState<ActivityKey | null>(null);
   const [note, setNote] = useState("");
   const [triggers, setTriggers] = useState<TriggerKey[]>([]);
+  const [songInput, setSongInput] = useState("");
+  const song = useMemo(() => parseSongInput(songInput), [songInput]);
   const [saved, setSaved] = useState<{ entry: Entry; risk: Risk } | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -37,7 +40,7 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
       toast("先选一个此刻最接近的情绪吧");
       return;
     }
-    const entry = addEntry({ mood, intensity, note, triggers, activity });
+    const entry = addEntry({ mood, intensity, note, triggers, activity, song });
     const risk = assessRisk({ valence: moodOf(mood).valence, intensity, note });
     setSaved({ entry, risk });
     setMood(null);
@@ -45,6 +48,7 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
     setActivity(null);
     setNote("");
     setTriggers([]);
+    setSongInput("");
     if (risk === "crisis") {
       toast("这条记录已经保存");
     } else {
@@ -166,6 +170,31 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
               placeholder="发生了什么？写下此刻的感受……不写也没关系。"
               className="mt-3 w-full resize-none rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
             />
+          </div>
+
+          <div>
+            <label htmlFor="song" className="text-sm font-medium">
+              此刻在听什么？（选填）
+            </label>
+            <input
+              id="song"
+              value={songInput}
+              onChange={(e) => setSongInput(e.target.value)}
+              placeholder="粘贴网易云、QQ 音乐或 Apple Music 的分享，或直接输入歌名"
+              className="mt-3 w-full rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
+            />
+            {song && (
+              <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">
+                {song.title ? (
+                  <>
+                    识别为：🎵《{song.title}》{song.artist ? ` · ${song.artist}` : ""}
+                    {song.platform ? ` · ${PLATFORM_LABEL[song.platform]}` : ""}
+                  </>
+                ) : (
+                  "没识别到歌名，可以直接输入歌名。"
+                )}
+              </p>
+            )}
           </div>
         </div>
       )}

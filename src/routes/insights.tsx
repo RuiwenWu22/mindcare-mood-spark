@@ -2,10 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { useEntries } from "@/hooks/use-entries";
+import { useBody } from "@/hooks/use-body";
+import { bodyFindings, bodyMoodStats, type BodyBucket } from "@/lib/body";
 import { SampleNotice } from "@/components/sample-notice";
 import {
   activityStats,
   analyzeEntries,
+  songsByMood,
   whatWorks,
   entryScore,
   lastNDays,
@@ -99,7 +102,10 @@ function InsightsPage() {
 
   const dist = moodDistribution(entries);
   const triggers = triggerRanking(entries);
-  const insight = analyzeEntries(entries);
+  const { logs } = useBody();
+  const body = useMemo(() => bodyMoodStats(entries, logs), [entries, logs]);
+  const playlist = useMemo(() => songsByMood(entries), [entries]);
+  const insight = analyzeEntries(entries, bodyFindings(entries, logs));
   const breakdown = useMemo(() => triggerMoodBreakdown(entries), [entries]);
   const slots = useMemo(() => timeOfDayStats(entries), [entries]);
   const scenes = useMemo(() => activityStats(entries), [entries]);
@@ -282,6 +288,68 @@ function InsightsPage() {
       </section>
 
       <section className="card-soft px-6 py-6 sm:px-8">
+        <h2 className="font-display text-lg font-semibold">身体和情绪</h2>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          把每天的睡眠、活动量和当天的记录放在一起看。数据来自首页的一键记录或快捷指令同步。
+        </p>
+        {body.sleep.every((b) => b.days === 0) && body.activity.every((b) => b.days === 0) ? (
+          <p className="mt-5 text-sm text-muted-foreground">
+            在首页记一下昨晚睡得怎么样、今天动得多不多，这里会显示它们和心情的关系。
+          </p>
+        ) : (
+          <div className="mt-6 grid gap-6 md:grid-cols-2">
+            <BodyBlock title="睡眠" buckets={body.sleep} />
+            <BodyBlock title="活动量" buckets={body.activity} />
+          </div>
+        )}
+      </section>
+
+      <section className="card-soft px-6 py-6 sm:px-8">
+        <h2 className="font-display text-lg font-semibold">你的情绪歌单</h2>
+        <p className="mt-1.5 text-sm text-muted-foreground">来自记录时填写的「此刻在听什么」。</p>
+        {playlist.bright.length === 0 && playlist.heavy.length === 0 ? (
+          <p className="mt-5 text-sm text-muted-foreground">
+            记录时填一下「此刻在听什么」，这里会整理出你的情绪歌单。
+          </p>
+        ) : (
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            {(
+              [
+                ["让你舒展的歌", playlist.bright],
+                ["陪你度过难受时刻的歌", playlist.heavy],
+              ] as const
+            ).map(([title, list]) => (
+              <div key={title}>
+                <h3 className="text-sm font-medium">{title}</h3>
+                {list.length === 0 ? (
+                  <p className="mt-2 text-xs text-muted-foreground">还没有</p>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {list.map((sg) => (
+                      <li key={`${sg.title}|${sg.artist ?? ""}`} className="flex items-center justify-between gap-2 rounded-2xl bg-secondary/50 px-4 py-2.5 text-sm">
+                        <span className="min-w-0 truncate">
+                          🎵《{sg.title}》{sg.artist ? ` · ${sg.artist}` : ""}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {sg.count > 1 ? `${sg.count} 次` : ""}
+                          {sg.sampleOnly ? " 示例" : ""}
+                          {sg.url && (
+                            <a href={sg.url} target="_blank" rel="noopener noreferrer" className="ml-2 underline underline-offset-2">
+                              去听
+                            </a>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="card-soft px-6 py-6 sm:px-8">
         <h2 className="font-display text-lg font-semibold">一天里的情绪强度</h2>
         <p className="mt-1.5 text-sm text-muted-foreground">按记录时间分成四个时段的平均强度。</p>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -379,6 +447,40 @@ function InsightsPage() {
           以上内容由你的记录自动整理，仅供自我觉察参考，并非医学诊断。
         </p>
       </section>
+    </div>
+  );
+}
+
+function BodyBlock({ title, buckets }: { title: string; buckets: BodyBucket[] }) {
+  return (
+    <div>
+      <h3 className="text-sm font-medium">{title}</h3>
+      <ul className="mt-3 space-y-3">
+        {buckets.map((b) => (
+          <li key={b.key}>
+            <div className="flex items-baseline justify-between text-sm">
+              <span>
+                {b.emoji} {b.label}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {b.days} 天 · {b.records} 条记录
+              </span>
+            </div>
+            <div
+              className="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-secondary"
+              title={`舒展 ${b.bright} · 一般 ${b.neutral} · 偏消耗 ${b.heavy}`}
+            >
+              {b.records > 0 && (
+                <>
+                  <span style={{ width: `${(b.bright / b.records) * 100}%`, backgroundColor: "var(--mood-calm)" }} />
+                  <span style={{ width: `${(b.neutral / b.records) * 100}%`, backgroundColor: "var(--mood-neutral)" }} />
+                  <span style={{ width: `${(b.heavy / b.records) * 100}%`, backgroundColor: "var(--mood-anxious)" }} />
+                </>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

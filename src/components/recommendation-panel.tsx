@@ -284,6 +284,31 @@ function RecommendationCard({
             </button>
           </div>
         )}
+        {rec.song && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-card/85 px-4 py-3.5">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-sm font-medium">
+                <Music className="h-4 w-4 text-muted-foreground" /> 听听《{rec.song.title}》
+                {rec.song.artist ? ` · ${rec.song.artist}` : ""}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {rec.song.sampleOnly ? "示例记录里，心情舒展时听过这首" : "你心情舒展的时候听过这首"}
+              </p>
+            </div>
+            {rec.song.url ? (
+              <a
+                href={rec.song.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium transition-colors hover:bg-secondary"
+              >
+                去听
+              </a>
+            ) : (
+              <span className="shrink-0 text-xs text-muted-foreground">在音乐 App 里搜</span>
+            )}
+          </div>
+        )}
         <div className="rounded-2xl bg-card/85 px-4 py-3.5">
           <p className="flex items-center gap-1.5 text-sm font-medium">
             <Footprints className="h-4 w-4 text-muted-foreground" /> {rec.move.title}
