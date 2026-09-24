@@ -74,17 +74,17 @@ export function MoodComposer({ title = "你现在感觉怎么样？", id }: { ti
       toast("这条记录已经保存");
     } else {
       toast.success("今天的情绪已经被好好记录了 🌿", {
-        description: "可以到「情绪日记」里回顾它。",
+        description: "可以到「日记」里回顾它。",
       });
     }
   };
 
   return (
-    <section id={id} className="card-soft animate-rise scroll-mt-24 px-6 py-7 sm:px-8">
+    <section id={id} className="card-soft animate-rise scroll-mt-24 px-5 py-6 sm:px-7">
       <h2 className="font-display text-xl font-semibold sm:text-2xl">{title}</h2>
       <p className="mt-1.5 text-sm text-muted-foreground">选一个最接近的就好，不用很准确。</p>
 
-      <div className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <div className="mt-5 grid grid-cols-4 gap-2 sm:gap-2.5">
         {MOODS.map((m) => {
           const active = mood === m.key;
           return (
@@ -93,7 +93,7 @@ export function MoodComposer({ title = "你现在感觉怎么样？", id }: { ti
               onClick={() => setMood(m.key)}
               aria-pressed={active}
               className={cn(
-                "flex flex-col items-center gap-1.5 rounded-2xl border px-3 py-4 transition-all",
+                "flex flex-col items-center gap-1 rounded-2xl border px-1 py-3 transition-all sm:gap-1.5 sm:px-3 sm:py-4",
                 active
                   ? "border-transparent shadow-[var(--shadow-soft)] ring-2 ring-primary"
                   : "border-border bg-secondary/40 hover:-translate-y-0.5 hover:bg-secondary",
@@ -101,7 +101,7 @@ export function MoodComposer({ title = "你现在感觉怎么样？", id }: { ti
               style={active ? { backgroundColor: `color-mix(in oklab, ${m.color} 28%, white)` } : undefined}
             >
               <span className="text-2xl">{m.emoji}</span>
-              <span className="text-sm">{m.label}</span>
+              <span className="whitespace-nowrap text-xs sm:text-sm">{m.label}</span>
             </button>
           );
         })}

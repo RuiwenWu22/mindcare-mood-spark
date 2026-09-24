@@ -32,7 +32,7 @@ export function CycleCard() {
 
   if (!cycle.ready) return null;
 
-  const shell = "card-soft px-6 py-6 sm:px-8";
+  const shell = "card-soft px-5 py-6 sm:px-7";
   const btn = "rounded-full border border-border bg-card px-4 py-2 text-sm transition-colors hover:bg-secondary";
 
   if (!cycle.enabled) {
