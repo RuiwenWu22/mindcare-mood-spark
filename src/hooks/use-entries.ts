@@ -6,6 +6,7 @@ import { clearWeatherCache } from "@/lib/weather";
 import { clearInterventions, removeInterventionsFor } from "@/lib/interventions";
 import { clearRecovery } from "@/lib/recovery";
 import type { Song } from "@/lib/songs";
+import type { RecordType } from "@/lib/scenarios";
 import {
   loadEntries,
   saveEntries,
@@ -50,6 +51,8 @@ export function useEntries() {
       triggers?: TriggerKey[];
       activity?: ActivityKey | null;
       song?: Song | null;
+      record_type?: RecordType;
+      event?: string | null;
     }) => {
       const auto = detectTriggers(input.note);
       const triggers = Array.from(new Set([...(input.triggers ?? []), ...auto]));
@@ -61,6 +64,8 @@ export function useEntries() {
         note: input.note.trim(),
         triggers,
         scale: 5,
+        record_type: input.record_type ?? "daily",
+        ...(input.event ? { event: input.event } : {}),
         ...(input.activity ? { activity: input.activity } : {}),
         ...(input.song?.title ? { song: input.song } : {}),
       };

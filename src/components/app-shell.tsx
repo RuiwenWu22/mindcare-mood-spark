@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { NotebookPen, Sparkles, Sun } from "lucide-react";
+import { HeartHandshake, NotebookPen, Sparkles, Sun } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { AmbientMiniPlayer } from "@/components/ambient-mini-player";
@@ -7,9 +7,14 @@ import { RecordSheetProvider } from "@/components/record-sheet";
 
 const NAV = [
   { to: "/", label: "今天", icon: Sun },
-  { to: "/insights", label: "洞察", icon: Sparkles },
   { to: "/journal", label: "记录", icon: NotebookPen },
+  { to: "/insights", label: "洞察", icon: Sparkles },
+  { to: "/care", label: "关怀", icon: HeartHandshake },
 ] as const;
+
+/** 恢复空间等"特别时期"页面从「今天」进入，导航上仍然高亮「今天」 */
+const isActive = (pathname: string, to: string) =>
+  to === "/" ? pathname === "/" || pathname.startsWith("/recovery") : pathname === to || pathname.startsWith(`${to}/`);
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -28,7 +33,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             <nav className="hidden items-center gap-1 md:flex">
               {NAV.map((item) => {
-                const active = pathname === item.to;
+                const active = isActive(pathname, item.to);
                 return (
                   <Link
                     key={item.to}
@@ -109,7 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/90 backdrop-blur-xl md:hidden">
           <div className="mx-auto flex max-w-md items-stretch justify-between px-2 pb-[max(0.375rem,env(safe-area-inset-bottom))] pt-1.5">
             {NAV.map((item) => {
-              const active = pathname === item.to;
+              const active = isActive(pathname, item.to);
               const Icon = item.icon;
               return (
                 <Link

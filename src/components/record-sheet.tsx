@@ -26,19 +26,27 @@ import { ACTIONS, buildRecommendation, type CareAction } from "@/lib/care-recs";
 import { addIntervention, loadInterventions, setAfterScore } from "@/lib/interventions";
 import type { Song } from "@/lib/songs";
 import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
+import { SCENARIOS, recordTypeOf } from "@/lib/scenarios";
 
-type Ctx = { open: (mood?: MoodKey) => void };
+type Ctx = { open: (mood?: MoodKey, scenario?: ScenarioKey) => void };
+type ScenarioKey = "work" | "family";
 const RecordSheetContext = createContext<Ctx>({ open: () => {} });
 export const useRecordSheet = () => useContext(RecordSheetContext);
 
 /** 全站共用一个记录弹层：首页点情绪、记录页点"记一条"都会打开它 */
 export function RecordSheetProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<{ open: boolean; mood: MoodKey | null; key: number }>({
+  const [state, setState] = useState<{ open: boolean; mood: MoodKey | null; scenario: ScenarioKey | null; key: number }>({
     open: false,
     mood: null,
+    scenario: null,
     key: 0,
   });
-  const open = useCallback((mood?: MoodKey) => setState((s) => ({ open: true, mood: mood ?? null, key: s.key + 1 })), []);
+  const open = useCallback(
+    (mood?: MoodKey, scenario?: ScenarioKey) =>
+      setState((s) => ({ open: true, mood: mood ?? null, scenario: scenario ?? null, key: s.key + 1 })),
+    [],
+  );
   const close = useCallback(() => setState((s) => ({ ...s, open: false })), []);
   const value = useMemo(() => ({ open }), [open]);
 
@@ -46,7 +54,7 @@ export function RecordSheetProvider({ children }: { children: ReactNode }) {
     <RecordSheetContext.Provider value={value}>
       {children}
       <BottomSheet open={state.open} onClose={close} label="记录此刻的情绪">
-        <RecordFlow key={state.key} initialMood={state.mood} onClose={close} />
+        <RecordFlow key={state.key} initialMood={state.mood} scenario={state.scenario} onClose={close} />
       </BottomSheet>
     </RecordSheetContext.Provider>
   );
@@ -54,12 +62,23 @@ export function RecordSheetProvider({ children }: { children: ReactNode }) {
 
 type Stage = "form" | "result" | "rest" | "feedback";
 
-function RecordFlow({ initialMood, onClose }: { initialMood: MoodKey | null; onClose: () => void }) {
+function RecordFlow({
+  initialMood,
+  scenario: scenarioKey,
+  onClose,
+}: {
+  initialMood: MoodKey | null;
+  /** 特别时期：工作压力 / 家庭烦恼。记录类型和"发生了什么"会一起保存 */
+  scenario: ScenarioKey | null;
+  onClose: () => void;
+}) {
   const { addEntry } = useEntries();
+  const scenario = scenarioKey ? SCENARIOS[scenarioKey] : null;
+  const [event, setEvent] = useState<string | null>(null);
   const [mood, setMood] = useState<MoodKey | null>(initialMood);
   const [changing, setChanging] = useState(initialMood === null);
   const [intensity, setIntensity] = useState<number | null>(null);
-  const [triggers, setTriggers] = useState<TriggerKey[]>([]);
+  const [triggers, setTriggers] = useState<TriggerKey[]>(scenario ? [scenario.trigger] : []);
   const [note, setNote] = useState("");
   const [more, setMore] = useState(false);
   const [activity, setActivity] = useState<ActivityKey | null>(null);
@@ -90,9 +109,18 @@ function RecordFlow({ initialMood, onClose }: { initialMood: MoodKey | null; onC
   );
 
   const save = () => {
-    if (!mood || intensity === null) return;
+    if (!mood || intensity === null || (scenario && !event)) return;
     const chosen = triggers;
-    const entry = addEntry({ mood, intensity, note, triggers: chosen, activity, song });
+    const entry = addEntry({
+      mood,
+      intensity,
+      note,
+      triggers: chosen,
+      activity,
+      song,
+      record_type: scenario?.type ?? "daily",
+      event,
+    });
     const risk = assessRisk({ valence: moodOf(mood).valence, intensity, note });
     setSaved({ entry, risk, chosen });
     setStage("result");
@@ -132,9 +160,37 @@ function RecordFlow({ initialMood, onClose }: { initialMood: MoodKey | null; onC
     const m = mood ? moodOf(mood) : null;
     return (
       <div className="pb-1">
+        {scenario && (
+          <div className="mb-6">
+            <p className="pr-10 text-xs text-muted-foreground">
+              特别时期 · {scenario.emoji} {scenario.title}
+            </p>
+            <h2 className="mt-1 font-display text-xl font-semibold">发生了什么？</h2>
+            <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="发生了什么">
+              {scenario.events.map((ev) => (
+                <button
+                  key={ev.key}
+                  role="radio"
+                  aria-checked={event === ev.key}
+                  onClick={() => setEvent(ev.key)}
+                  className={cn(
+                    "rounded-full border px-3.5 py-2 text-sm transition-colors",
+                    event === ev.key
+                      ? "border-primary/70 bg-primary-soft font-medium text-foreground"
+                      : "border-border text-muted-foreground hover:bg-secondary",
+                  )}
+                >
+                  {ev.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {changing || !m ? (
           <>
-            <h2 className="pr-10 font-display text-xl font-semibold">今天感觉怎么样？</h2>
+            <h2 className={cn("font-display text-xl font-semibold", scenario ? "text-lg" : "pr-10")}>
+              {scenario ? "现在的感受是？" : "今天感觉怎么样？"}
+            </h2>
             <div className="mt-4 grid grid-cols-4 gap-2">
               {MOODS.map((x) => (
                 <button
@@ -222,7 +278,7 @@ function RecordFlow({ initialMood, onClose }: { initialMood: MoodKey | null; onC
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={3}
-                placeholder="例如：明天要汇报，总觉得还有很多没有准备好……"
+                placeholder={scenario?.placeholder ?? "例如：明天要汇报，总觉得还有很多没有准备好……"}
                 className="mt-3 w-full resize-none rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
               />
               <p className="mt-1 text-xs text-muted-foreground">可跳过</p>
@@ -267,13 +323,15 @@ function RecordFlow({ initialMood, onClose }: { initialMood: MoodKey | null; onC
             <div className="sticky bottom-0 -mx-5 bg-card px-5 pb-1 pt-2 sm:-mx-7 sm:px-7">
               <button
                 onClick={save}
-                disabled={intensity === null}
+                disabled={intensity === null || (!!scenario && !event)}
                 className="w-full rounded-full bg-primary px-6 py-3.5 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity disabled:opacity-45"
               >
                 记录下来
               </button>
-              {intensity === null && (
-                <p className="mt-1.5 text-center text-xs text-muted-foreground">选一下强度就可以记录了</p>
+              {(intensity === null || (scenario && !event)) && (
+                <p className="mt-1.5 text-center text-xs text-muted-foreground">
+                  {scenario && !event ? "选一下发生了什么，再选强度就可以记录了" : "选一下强度就可以记录了"}
+                </p>
               )}
             </div>
           </div>
@@ -311,6 +369,16 @@ function RecordFlow({ initialMood, onClose }: { initialMood: MoodKey | null; onC
           {m.emoji} {m.label} · {saved.entry.intensity}/5
         </span>
       </p>
+      {saved.entry.record_type && saved.entry.record_type !== "daily" && (
+        <Link
+          to="/journal"
+          search={{ type: saved.entry.record_type }}
+          onClick={onClose}
+          className="-mt-2 block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        >
+          已放进「记录 → {recordTypeOf(saved.entry.record_type).label}」，之后可以在那里找到它
+        </Link>
+      )}
 
       {saved.risk === "crisis" ? (
         <>

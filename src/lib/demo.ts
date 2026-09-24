@@ -8,6 +8,7 @@ import type { DayLog, SleepQuality } from "@/lib/body";
 import { dayKey } from "@/lib/mood";
 import type { Song } from "@/lib/songs";
 import type { ContactUrge, UrgeTrigger } from "@/lib/recovery";
+import type { RecordType } from "@/lib/scenarios";
 
 const at = (now: Date, daysAgo: number, hour: number, minute: number) => {
   const d = new Date(now);
@@ -28,8 +29,17 @@ const ROWS: Row[] = [
   ["j", 4, 9, 30, "irritated", 3, ["sleep"], "没睡好，早上起来就很烦。", "rest"],
   ["g", 5, 16, 0, "anxious", 3, [], "下午有点心慌，说不上来为什么。", "work"],
   ["h", 5, 19, 30, "sad", 3, ["relationship"], "和朋友有点误会，心里闷闷的。", "rest"],
+  ["k", 5, 20, 30, "irritated", 4, ["family"], "妈妈又打电话问我什么时候回家，说着说着就不开心了。", "rest"],
   ["i", 6, 10, 0, "okay", 3, [], "周末睡了个懒觉，慢慢吃了早饭。", "eat", { title: "晴天", artist: "周杰伦" }],
 ];
+
+/** 在「特别时期」里记下的示例：记录类型和"发生了什么" */
+const TYPED: Record<string, [RecordType, string]> = {
+  a: ["work", "overload"],
+  c: ["work", "overload"],
+  f: ["work", "drain"],
+  k: ["family", "pushed"],
+};
 
 /** [记录, 方式, 类型, 前, 后, 秒] */
 const DONE: [string, string, Intervention["intervention_type"], number, number, number][] = [
@@ -62,6 +72,8 @@ export function demoData(now: Date = new Date()): DemoData {
     triggers,
     activity,
     scale: 5,
+    record_type: TYPED[id]?.[0] ?? "daily",
+    ...(TYPED[id] ? { event: TYPED[id]![1] } : {}),
     ...(song ? { song } : {}),
   }));
   const byId = new Map(ROWS.map((r) => [r[0], r]));

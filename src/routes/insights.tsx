@@ -1,15 +1,17 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
 import { useEntries } from "@/hooks/use-entries";
 import { useBody } from "@/hooks/use-body";
 import { useInterventions } from "@/hooks/use-interventions";
 import { bodyInsight, bodyMoodStats } from "@/lib/body";
 import { CycleCard } from "@/components/cycle-card";
 import { AiCard, WhyToggle } from "@/components/ai-card";
-import { Placeholder, SectionCard, ValenceRows } from "@/components/section";
+import { Placeholder, SectionCard, Segmented, ValenceRows } from "@/components/section";
+import { BottomSheet } from "@/components/bottom-sheet";
+import { TriggerDrill } from "@/components/trigger-drill";
+import { useRecovery } from "@/hooks/use-recovery";
 import { useRecordSheet } from "@/components/record-sheet";
-import { activityStats, entryScore, lastNDays, moodDistribution, moodOf, songsByMood } from "@/lib/mood";
+import { activityStats, entryScore, lastNDays, moodDistribution, moodOf, songsByMood, type Entry } from "@/lib/mood";
 import { DAY_PARTS, nextWeekTips, triggerInsight, triggerStats, weeklyDiscovery, whatWorks } from "@/lib/insights";
 import { TRIGGER_DOT_LIMIT, TriggerRows } from "@/components/trigger-rows";
 import { RecoveryInsights } from "@/components/recovery/recovery-insights";
@@ -35,6 +37,9 @@ function TrendChart({ points }: { points: { label: string; score: number | null;
   const step = points.length > 1 ? (w - pad * 2) / (points.length - 1) : 0;
   const y = (s: number) => pad + (1 - s / 100) * (h - pad * 2);
   const coords = points.map((p, i) => ({ ...p, x: pad + i * step, y: p.score === null ? null : y(p.score) }));
+  const last = points.length - 1;
+  const dense = points.length > 10;
+  const every = Math.ceil(points.length / 6);
   const filled = coords.filter((c) => c.y !== null) as { x: number; y: number; label: string; emoji?: string }[];
   const line = filled.map((c, i) => `${i === 0 ? "M" : "L"}${c.x},${c.y}`).join(" ");
   const area =
@@ -70,17 +75,45 @@ function TrendChart({ points }: { points: { label: string; score: number | null;
           <circle key={c.x} cx={c.x} cy={c.y} r={5} fill="var(--card)" stroke="var(--primary)" strokeWidth={3} />
         ))}
       </svg>
-      <div className="mt-2 flex justify-between px-1 text-xs text-muted-foreground">
-        {points.map((p) => (
-          <span key={p.label} className="flex-1 text-center">
-            <span className="block text-base">{p.emoji ?? "·"}</span>
-            {p.label}
-          </span>
-        ))}
-      </div>
+      {dense ? (
+        /* 30 天：从今天往前每隔几天标一个日期，位置和上面的点对齐 */
+        <div className="relative mt-2 h-4 text-xs text-muted-foreground" aria-hidden>
+          {coords.map((c, i) =>
+            (last - i) % every === 0 ? (
+              <span
+                key={c.label}
+                className="absolute whitespace-nowrap"
+                style={{
+                  left: `${(c.x / w) * 100}%`,
+                  transform: i === 0 ? "none" : i === last ? "translateX(-100%)" : "translateX(-50%)",
+                }}
+              >
+                {c.label}
+              </span>
+            ) : null,
+          )}
+        </div>
+      ) : (
+        <div className="mt-2 flex justify-between px-1 text-xs text-muted-foreground">
+          {points.map((p) => (
+            <span key={p.label} className="flex-1 text-center">
+              <span className="block text-base">{p.emoji ?? "·"}</span>
+              {p.label}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
+
+type Tab = "trend" | "triggers" | "body" | "works";
+const TABS: { key: Tab; label: string }[] = [
+  { key: "trend", label: "情绪变化" },
+  { key: "triggers", label: "触发因素" },
+  { key: "body", label: "身体关联" },
+  { key: "works", label: "有效方法" },
+];
 
 function InsightsPage() {
   const { demo } = Route.useSearch();
@@ -101,7 +134,21 @@ function InsightsPage() {
   const discovery = useMemo(() => (now ? weeklyDiscovery(entries, now) : null), [entries, now]);
   const methods = useMemo(() => whatWorks(entries, interventions), [entries, interventions]);
   const tips = useMemo(() => (discovery ? nextWeekTips(discovery, methods) : []), [discovery, methods]);
-  const days = useMemo(() => lastNDays(entries, 7), [entries]);
+  const [trendRange, setTrendRange] = useState<"7" | "30">("7");
+  const days = useMemo(() => lastNDays(entries, Number(trendRange)), [entries, trendRange]);
+  const recovery = useRecovery();
+  const [drill, setDrill] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("trend");
+  // 支持 /insights#triggers 这样的链接；#recovery（今天页的"查看恢复轨迹"）打开触发因素
+  const hash = useRouterState({ select: (s) => s.location.hash });
+  useEffect(() => {
+    if (hash === "recovery") setTab("triggers");
+    else if (TABS.some((t) => t.key === hash)) setTab(hash as Tab);
+  }, [hash]);
+  const pick = (t: Tab) => {
+    setTab(t);
+    window.history.replaceState(null, "", `#${t}`);
+  };
   const points = days.map((d) => {
     if (d.entries.length === 0) return { label: d.label, score: null };
     const score = d.entries.reduce((s, e) => s + entryScore(e), 0) / d.entries.length;
@@ -109,6 +156,22 @@ function InsightsPage() {
     return { label: d.label, score, emoji: moodOf(strongest.mood).emoji };
   });
   const dist = useMemo(() => moodDistribution(entries), [entries]);
+  // 强度变化：偏消耗情绪的平均强度，和上一个同样长的时段比
+  const intensity = useMemo(() => {
+    if (!now) return null;
+    const n = Number(trendRange);
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - (n - 1));
+    const prevStart = new Date(start);
+    prevStart.setDate(prevStart.getDate() - n);
+    const avg = (l: Entry[]) =>
+      l.length ? Math.round((l.reduce((s, e) => s + e.intensity, 0) / l.length) * 10) / 10 : null;
+    const heavy = entries.filter((e) => moodOf(e.mood).valence < 0);
+    const cur = avg(heavy.filter((e) => new Date(e.createdAt) >= start));
+    const prev = avg(heavy.filter((e) => new Date(e.createdAt) >= prevStart && new Date(e.createdAt) < start));
+    return { n, cur, prev };
+  }, [entries, now, trendRange]);
   const triggers = useMemo(() => triggerStats(entries), [entries]);
   const triggerAi = useMemo(() => triggerInsight(entries), [entries]);
   const parts = useMemo(
@@ -153,11 +216,11 @@ function InsightsPage() {
     <div className="space-y-5">
       <header>
         <h1 className="font-display text-3xl font-semibold tracking-tight">洞察</h1>
-        <p className="mt-2 text-sm text-muted-foreground">从你的记录里发现情绪规律，以及什么方式对你有效。这些是线索，不是诊断。</p>
+        <p className="mt-2 text-sm text-muted-foreground">为什么我最近会这样？从你的记录里找线索，不是诊断。</p>
       </header>
 
       {demo && (
-        <div className="sticky top-[4.5rem] z-20 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-primary/50 bg-card/95 px-4 py-3 backdrop-blur">
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-primary/50 bg-card/95 px-4 py-3">
           <p className="text-sm font-medium">示例数据 · 不会保存到你的记录</p>
           <Link to="/insights" className="shrink-0 text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
             退出示例
@@ -198,6 +261,194 @@ function InsightsPage() {
             )}
           </AiCard>
 
+          <div className="sticky top-[4.5rem] z-20 rounded-full backdrop-blur-xl">
+            <Segmented items={TABS} value={tab} onChange={pick} label="洞察分类" />
+          </div>
+
+          {tab === "trend" && (
+            <div className="animate-rise space-y-5" role="tabpanel" aria-label="情绪变化">
+          {/* 4. 7 天情绪趋势 */}
+          <SectionCard
+            title={`最近 ${trendRange} 天情绪趋势`}
+            desc="越高代表那天的感受越轻松；空缺表示那天没有记录。"
+            action={
+              <Segmented
+                items={[
+                  { key: "7", label: "7 天" },
+                  { key: "30", label: "30 天" },
+                ]}
+                value={trendRange}
+                onChange={setTrendRange}
+                label="趋势范围"
+                className="w-40"
+              />
+            }
+          >
+            <TrendChart points={points} />
+          </SectionCard>
+
+          {/* 5. 高频情绪 */}
+          <SectionCard title="高频情绪">
+            <ul className="space-y-3.5">
+              {dist.slice(0, 5).map((d) => (
+                <li key={d.mood.key}>
+                  <div className="flex items-center justify-between text-sm">
+                    <span>
+                      {d.mood.emoji} {d.mood.label}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {d.count} 次 · {d.percent}%
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
+                    <div className="h-full rounded-full" style={{ width: `${d.percent}%`, backgroundColor: d.mood.color }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+
+          {intensity && (
+            <SectionCard title="强度变化" desc={`焦虑、低落、烦躁这类情绪的平均强度，和前 ${intensity.n} 天比。`}>
+              {intensity.cur === null ? (
+                <p className="text-sm text-muted-foreground">最近 {intensity.n} 天没有偏消耗的记录。</p>
+              ) : (
+                <>
+                  <p className="font-display text-2xl font-medium tabular-nums">
+                    {intensity.prev === null ? intensity.cur : `${intensity.prev} → ${intensity.cur}`}
+                    <span className="ml-1 text-sm font-normal text-muted-foreground">/ 5</span>
+                  </p>
+                  <p className="mt-1 text-sm text-foreground/85">
+                    {intensity.prev === null
+                      ? `前 ${intensity.n} 天没有这类记录，暂时还没法比较。`
+                      : intensity.cur < intensity.prev - 0.2
+                        ? `比前 ${intensity.n} 天轻了一些。`
+                        : intensity.cur > intensity.prev + 0.2
+                          ? `比前 ${intensity.n} 天重了一些，最近可以多照顾一下自己。`
+                          : `和前 ${intensity.n} 天差不多。`}
+                  </p>
+                </>
+              )}
+            </SectionCard>
+          )}
+
+          {/* 7. 时段 */}
+          <SectionCard title="一天里的情绪变化" desc="不同时段的记录数、平均强度，以及偏消耗的记录有几条。">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              {parts.map((p) => (
+                <div key={p.key} className="rounded-2xl bg-secondary/50 px-3 py-3 text-center">
+                  <p className="text-sm">{p.label}</p>
+                  <p className="text-[11px] text-muted-foreground">{p.range}</p>
+                  <p className="mt-1.5 font-display text-2xl font-medium tabular-nums">{p.avg === null ? "—" : p.avg}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {p.count === 0 ? "暂无记录" : `${p.count} 条 · 偏消耗 ${p.heavy}`}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
+            </div>
+          )}
+
+          {tab === "triggers" && (
+            <div className="animate-rise space-y-5" role="tabpanel" aria-label="触发因素">
+          {/* 6. 触发因素排行 */}
+          <SectionCard
+            title="常见的触发因素"
+            desc={
+              Math.max(0, ...triggers.map((t) => t.count)) < TRIGGER_DOT_LIMIT
+                ? "每个色块代表一次记录，颜色表示当时的情绪。"
+                : "长条越长，出现的次数越多；颜色表示当时的情绪。"
+            }
+          >
+            {triggers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">记录时选一下「可能和什么有关」，这里就会出现排行。</p>
+            ) : (
+              <>
+                {triggerAi && (
+                  <AiCard title="AI 发现" className="mb-5">
+                    <p className="text-[15px] leading-relaxed">{triggerAi.text}</p>
+                    <WhyToggle items={triggerAi.evidence} />
+                  </AiCard>
+                )}
+                <TriggerRows stats={triggers} onSelect={setDrill} />
+              </>
+            )}
+          </SectionCard>
+
+          {(recoverySample ? recoverySample.urges.length : 0) + (demo ? 0 : recovery.urges.length) > 0 && (
+            <button
+              onClick={() => setDrill("intimate")}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-card/70 px-5 py-4 text-left text-sm transition-colors hover:bg-secondary"
+            >
+              <span>
+                <span className="font-medium">💔 感情</span>
+                <span className="ml-2 text-muted-foreground">
+                  另有 {recoverySample ? recoverySample.urges.length : recovery.urges.length} 次联系冲动记录
+                </span>
+              </span>
+              <span className="text-muted-foreground">细分 →</span>
+            </button>
+          )}
+          {now && (recoverySample ? <RecoveryInsights now={now} sample={recoverySample} /> : <RecoveryInsights now={now} />)}
+              <SectionCard title="在做什么的时候，感受如何" desc="按记录时选的「此刻在做什么」分组。">
+                {scenes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">记录时在「更多」里选一下此刻在做什么。</p>
+                ) : (
+                  <ValenceRows rows={scenes} />
+                )}
+              </SectionCard>
+
+            </div>
+          )}
+
+          {tab === "body" && (
+            <div className="animate-rise space-y-5" role="tabpanel" aria-label="身体关联">
+              <SectionCard title="睡眠、活动和情绪" desc="看看不同睡眠和活动状态下，你通常处于怎样的情绪状态。">
+                {body.sleep.every((b) => b.days === 0) && body.activity.every((b) => b.days === 0) ? (
+                  <p className="mt-3 text-sm text-muted-foreground">在「今天」记一下睡眠和活动量，这里会显示它们和心情的关系。</p>
+                ) : (
+                  <>
+                    <AiCard title="AI 发现" className="mt-3">
+                      {bodyAi.status === "found" ? (
+                        <ul className="space-y-2.5">
+                          {bodyAi.lines.map((l) => (
+                            <li key={l.headline}>
+                              <p className="text-[15px] font-medium leading-relaxed">{l.headline}</p>
+                              <p className="mt-0.5 text-sm leading-relaxed text-foreground/80">{l.detail}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm leading-relaxed">
+                          {bodyAi.status === "few"
+                            ? "目前记录还比较少，再记录几次后会更容易看出规律。"
+                            : "目前还看不出睡眠、活动和情绪之间的明显关系。"}
+                        </p>
+                      )}
+                      <WhyToggle items={bodyAi.evidence} />
+                    </AiCard>
+                    <div className="mt-5 grid gap-6 md:grid-cols-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">睡眠</p>
+                        <ValenceRows className="mt-2" rows={body.sleep.map((b) => ({ ...b, label: `睡得${b.label}` }))} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">活动量</p>
+                        <ValenceRows className="mt-2" rows={body.activity} />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </SectionCard>
+
+              {!demo && <CycleCard />}
+            </div>
+          )}
+
+          {tab === "works" && (
+            <div className="animate-rise space-y-5" role="tabpanel" aria-label="有效方法">
           {/* 2. 什么对我有效 */}
           <SectionCard title="🌿 最近对你帮助比较大的方式" desc="做完调节后，你自己评的强度变化。">
             {methods.length === 0 ? (
@@ -253,136 +504,11 @@ function InsightsPage() {
             </SectionCard>
           )}
 
-          {/* 失恋恢复模式：开启后才显示；示例洞察里显示示例数据 */}
-          {now && (recoverySample ? <RecoveryInsights now={now} sample={recoverySample} /> : <RecoveryInsights now={now} />)}
-
-          {/* 4. 7 天情绪趋势 */}
-          <SectionCard title="最近 7 天情绪趋势" desc="越高代表那天的感受越轻松；空缺表示那天没有记录。">
-            <TrendChart points={points} />
-          </SectionCard>
-
-          {/* 5. 高频情绪 */}
-          <SectionCard title="高频情绪">
-            <ul className="space-y-3.5">
-              {dist.slice(0, 5).map((d) => (
-                <li key={d.mood.key}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span>
-                      {d.mood.emoji} {d.mood.label}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {d.count} 次 · {d.percent}%
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
-                    <div className="h-full rounded-full" style={{ width: `${d.percent}%`, backgroundColor: d.mood.color }} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </SectionCard>
-
-          {/* 6. 触发因素排行 */}
-          <SectionCard
-            title="常见的触发因素"
-            desc={
-              Math.max(0, ...triggers.map((t) => t.count)) < TRIGGER_DOT_LIMIT
-                ? "每个色块代表一次记录，颜色表示当时的情绪。"
-                : "长条越长，出现的次数越多；颜色表示当时的情绪。"
-            }
-          >
-            {triggers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">记录时选一下「可能和什么有关」，这里就会出现排行。</p>
-            ) : (
-              <>
-                {triggerAi && (
-                  <AiCard title="AI 发现" className="mb-5">
-                    <p className="text-[15px] leading-relaxed">{triggerAi.text}</p>
-                    <WhyToggle items={triggerAi.evidence} />
-                  </AiCard>
-                )}
-                <TriggerRows stats={triggers} />
-              </>
-            )}
-          </SectionCard>
-
-          {/* 7. 时段 */}
-          <SectionCard title="一天里的情绪变化" desc="不同时段的记录数、平均强度，以及偏消耗的记录有几条。">
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              {parts.map((p) => (
-                <div key={p.key} className="rounded-2xl bg-secondary/50 px-3 py-3 text-center">
-                  <p className="text-sm">{p.label}</p>
-                  <p className="text-[11px] text-muted-foreground">{p.range}</p>
-                  <p className="mt-1.5 font-display text-2xl font-medium tabular-nums">{p.avg === null ? "—" : p.avg}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {p.count === 0 ? "暂无记录" : `${p.count} 条 · 偏消耗 ${p.heavy}`}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          {/* 更多规律：默认收起 */}
-          <details className="group card-soft px-5 py-5 sm:px-7">
-            <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
-              更多规律：场景 · 睡眠与活动 · 周期 · 歌单
-              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="mt-5 space-y-7">
-              <div>
-                <h3 className="text-sm font-medium">在做什么的时候，感受如何</h3>
-                {scenes.length === 0 ? (
-                  <p className="mt-2 text-sm text-muted-foreground">记录时在「更多」里选一下此刻在做什么。</p>
-                ) : (
-                  <ValenceRows className="mt-3" rows={scenes} />
-                )}
-              </div>
-              <div>
-                <h3 className="text-sm font-medium">睡眠、活动和情绪</h3>
-                <p className="mt-1 text-xs text-muted-foreground">看看不同睡眠和活动状态下，你通常处于怎样的情绪状态。</p>
-                {body.sleep.every((b) => b.days === 0) && body.activity.every((b) => b.days === 0) ? (
-                  <p className="mt-3 text-sm text-muted-foreground">在「今天」记一下睡眠和活动量，这里会显示它们和心情的关系。</p>
-                ) : (
-                  <>
-                    <AiCard title="AI 发现" className="mt-3">
-                      {bodyAi.status === "found" ? (
-                        <ul className="space-y-2.5">
-                          {bodyAi.lines.map((l) => (
-                            <li key={l.headline}>
-                              <p className="text-[15px] font-medium leading-relaxed">{l.headline}</p>
-                              <p className="mt-0.5 text-sm leading-relaxed text-foreground/80">{l.detail}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-sm leading-relaxed">
-                          {bodyAi.status === "few"
-                            ? "目前记录还比较少，再记录几次后会更容易看出规律。"
-                            : "目前还看不出睡眠、活动和情绪之间的明显关系。"}
-                        </p>
-                      )}
-                      <WhyToggle items={bodyAi.evidence} />
-                    </AiCard>
-                    <div className="mt-5 grid gap-6 md:grid-cols-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground">睡眠</p>
-                        <ValenceRows className="mt-2" rows={body.sleep.map((b) => ({ ...b, label: `睡得${b.label}` }))} />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">活动量</p>
-                        <ValenceRows className="mt-2" rows={body.activity} />
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-              {!demo && <CycleCard />}
-              <div>
-                <h3 className="text-sm font-medium">你的情绪歌单</h3>
+              <SectionCard title="你的情绪歌单" desc="让你舒展的歌，也是一种有效的方法。">
                 {playlist.bright.length === 0 && playlist.heavy.length === 0 ? (
-                  <p className="mt-2 text-sm text-muted-foreground">记录时在「更多」里填一下此刻在听什么。</p>
+                  <p className="text-sm text-muted-foreground">记录时在「更多」里填一下此刻在听什么。</p>
                 ) : (
-                  <div className="mt-3 grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-4 md:grid-cols-2">
                     {(
                       [
                         ["让你舒展的歌", playlist.bright],
@@ -413,11 +539,23 @@ function InsightsPage() {
                     ))}
                   </div>
                 )}
-              </div>
+              </SectionCard>
+
             </div>
-          </details>
+          )}
         </>
       )}
+      <BottomSheet open={!!drill} onClose={() => setDrill(null)} label="触发因素细分">
+        {drill && (
+          <TriggerDrill
+            triggerKey={drill}
+            entries={entries}
+            urges={recoverySample?.urges ?? (demo ? [] : recovery.urges)}
+            demo={!!demo}
+            onClose={() => setDrill(null)}
+          />
+        )}
+      </BottomSheet>
     </div>
   );
 }

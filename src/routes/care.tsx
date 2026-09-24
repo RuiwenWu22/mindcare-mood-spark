@@ -1,6 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronDown, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { BottomSheet } from "@/components/bottom-sheet";
 import { FeedbackStep } from "@/components/feedback-step";
 import { ActionRunner, type RunResult } from "@/components/action-runner";
@@ -8,16 +8,17 @@ import { SectionCard } from "@/components/section";
 import { useRecordSheet } from "@/components/record-sheet";
 import { useEntries } from "@/hooks/use-entries";
 import { useInterventions } from "@/hooks/use-interventions";
-import { ACTIONS, buildRecommendation, type CareAction } from "@/lib/care-recs";
+import { ACTIONS, actionByTitle, buildRecommendation, type CareAction } from "@/lib/care-recs";
+import { whatWorks } from "@/lib/insights";
 import { addIntervention, setAfterScore } from "@/lib/interventions";
 import { DAILY_PROMPTS, moodOf, type Entry } from "@/lib/mood";
 
 export const Route = createFileRoute("/care")({
   head: () => ({
     meta: [
-      { title: "照顾一下自己｜MindCare" },
+      { title: "关怀｜MindCare" },
       { name: "description", content: "根据你刚刚的记录推荐一个调节方式，也可以按此刻的状态换一种。" },
-      { property: "og:title", content: "照顾一下自己｜MindCare" },
+      { property: "og:title", content: "关怀｜MindCare" },
       { property: "og:description", content: "根据你刚刚的记录，为你推荐。" },
     ],
   }),
@@ -27,20 +28,26 @@ export const Route = createFileRoute("/care")({
 /** 多久以内的记录算"刚刚"，用来做推荐和调节前的分数 */
 const RECENT_HOURS = 6;
 
-/** 按此刻的状态组织，而不是按工具分类 */
-const BY_STATE: { emoji: string; state: string; action: CareAction }[] = [
-  { emoji: "🌀", state: "脑子停不下来", action: ACTIONS.rain },
-  { emoji: "😤", state: "身体很紧绷", action: ACTIONS.neck },
-  { emoji: "😴", state: "想准备睡觉", action: ACTIONS.bedtime },
-  { emoji: "😟", state: "现在比较焦虑", action: ACTIONS.slow },
+/** 每个方法附上"什么时候用"，按用户此刻的状态来理解，而不是按工具分类 */
+type Item = { action: CareAction; when: string };
+const NOW_ITEMS: Item[] = [
+  { action: ACTIONS.slow, when: "现在比较焦虑时" },
+  { action: ACTIONS.box, when: "心跳有点快、很紧绷时" },
+  { action: ACTIONS.relax478, when: "想让自己慢下来时" },
+  { action: ACTIONS.neck, when: "身体很紧绷时" },
 ];
-
-const LIBRARY: { title: string; items: CareAction[] }[] = [
-  { title: "呼吸", items: [ACTIONS.slow, ACTIONS.box, ACTIONS.relax478] },
-  { title: "音乐", items: [ACTIONS.rain, ACTIONS.waves, ACTIONS.piano, ACTIONS.morning] },
-  { title: "运动", items: [ACTIONS.neck, ACTIONS.walk] },
-  { title: "睡眠", items: [ACTIONS.bedtime] },
+const LONGER_ITEMS: Item[] = [
+  { action: ACTIONS.rain, when: "脑子停不下来时" },
+  { action: ACTIONS.waves, when: "想跟着声音放慢呼吸时" },
+  { action: ACTIONS.piano, when: "有点低落、想有人陪着时" },
+  { action: ACTIONS.morning, when: "状态不错、想延续时" },
+  { action: ACTIONS.walk, when: "坐太久、闷得慌时" },
 ];
+const NIGHT_ITEMS: Item[] = [
+  { action: ACTIONS.bedtime, when: "想准备睡觉时" },
+  { action: ACTIONS.relax478, when: "躺下了还睡不着时" },
+];
+const NIGHT_TIPS = ["睡前 30 分钟把手机放远一点，把灯光调暗。", "想太多的话，先把脑子里的事写下来再睡。"];
 
 function agoText(iso: string) {
   const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
@@ -67,6 +74,10 @@ function CarePage() {
     [recent, entries, interventions],
   );
 
+  const best = useMemo(
+    () => whatWorks(entries, interventions).filter((m) => m.avgDrop > 0).slice(0, 3),
+    [entries, interventions],
+  );
   const start = (a: CareAction) => setRunning(a);
   const onRunClose = (result: RunResult) => {
     const action = running;
@@ -77,15 +88,11 @@ function CarePage() {
     }
   };
 
-  const row = "flex w-full items-center gap-3 rounded-2xl border border-border px-4 py-3.5 text-left transition-colors hover:bg-secondary";
-
   return (
     <div className="space-y-5">
       <header>
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> 今天
-        </Link>
-        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">照顾一下自己</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">关怀</h1>
+        <p className="mt-2 text-sm text-muted-foreground">我现在可以做什么？选一件最容易做到的，就从它开始。</p>
       </header>
 
       {/* ---------- 根据你刚刚的记录 ---------- */}
@@ -107,77 +114,71 @@ function CarePage() {
             >
               开始
             </button>
-            <a href="#other" className="rounded-full border border-border px-5 py-3 text-sm transition-colors hover:bg-secondary">
+            <a href="#now" className="rounded-full border border-border px-5 py-3 text-sm transition-colors hover:bg-secondary">
               其他方式
             </a>
           </div>
         </section>
       ) : (
-        <section className="card-soft px-5 py-6 sm:px-7">
-          <p className="font-display text-lg font-semibold">先记一下现在的感受</p>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            记录之后，会根据你的情绪和强度推荐一个方式，做完还能看到前后的变化。
-          </p>
+        ready && (
           <button
             onClick={() => open()}
-            className="mt-4 rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)]"
+            className="w-full rounded-2xl border border-dashed border-border px-5 py-4 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary/50"
           >
-            记录此刻的情绪
+            先记一下现在的感受，推荐会更适合你，做完还能看到前后的变化 →
           </button>
-        </section>
+        )
       )}
 
-      {/* ---------- 想换一种方式？ ---------- */}
-      <SectionCard id="other" title="想换一种方式？" desc="按你此刻的状态选一个。">
-        <ul className="grid gap-2.5 sm:grid-cols-2">
-          {BY_STATE.map((s) => (
-            <li key={s.state}>
-              <button onClick={() => start(s.action)} className={row}>
-                <span className="text-2xl" aria-hidden>
-                  {s.emoji}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium">{s.state}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {s.action.title}
-                  </span>
-                </span>
-                <Play className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>
-            </li>
-          ))}
-        </ul>
+      {/* ---------- 对你最有效 ---------- */}
+      <SectionCard title="对你最有效" desc="按你做完调节后自己评的分排序：强度下降越多，排得越前。" className="bg-primary-soft/40">
+        {!ready ? null : best.length === 0 ? (
+          <p className="text-sm text-muted-foreground">做完一次调节、评一下前后的感受，这里就会按你自己的效果排序。</p>
+        ) : (
+          <ul className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
+            {best.map((m, i) => {
+              const a = actionByTitle(m.name);
+              return (
+                <li key={m.name} className="flex flex-col justify-between gap-3 rounded-2xl bg-card px-4 py-3.5">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {a?.emoji ?? "🌿"} {m.name}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      平均 {m.avgBefore} → {m.avgAfter} · 做了 {m.count} 次
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-display text-lg tabular-nums">↓ {m.avgDrop}</span>
+                    {a ? (
+                      <button
+                        onClick={() => start(a)}
+                        className={`rounded-full px-4 py-1.5 text-xs font-medium ${
+                          i === 0 && !recent ? "bg-primary text-primary-foreground" : "border border-border hover:bg-secondary"
+                        }`}
+                      >
+                        开始
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">来自今日小计划</span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </SectionCard>
 
-      {/* ---------- 探索所有方式 ---------- */}
-      <details className="group card-soft px-5 py-5 sm:px-7">
-        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
-          探索所有方式
-          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
-        </summary>
-        <div className="mt-5 space-y-5">
-          {LIBRARY.map((g) => (
-            <div key={g.title}>
-              <p className="text-xs text-muted-foreground">{g.title}</p>
-              <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-                {g.items.map((a) => (
-                  <li key={a.id}>
-                    <button onClick={() => start(a)} className={row}>
-                      <span className="text-xl" aria-hidden>
-                        {a.emoji}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium">{a.title}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{a.desc}</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+      <ItemsSection id="now" title="现在就能做" desc="两三分钟，坐着也能完成。" items={NOW_ITEMS} onStart={start} />
+      <ItemsSection title="需要一点时间" desc="10 分钟左右。背景声到时间会自动淡出，任何页面都能停止。" items={LONGER_ITEMS} onStart={start} />
+      <ItemsSection title="睡前" desc="把这一天轻轻放下。" items={NIGHT_ITEMS} onStart={start}>
+        <ul className="mt-3 space-y-1.5 text-sm text-foreground/80">
+          {NIGHT_TIPS.map((t) => (
+            <li key={t}>· {t}</li>
           ))}
-        </div>
-      </details>
+        </ul>
+      </ItemsSection>
 
       <p className="px-1 text-center text-xs leading-relaxed text-muted-foreground">
         {quote}
@@ -226,5 +227,48 @@ function CarePage() {
           ))}
       </BottomSheet>
     </div>
+  );
+}
+
+function ItemsSection({
+  id,
+  title,
+  desc,
+  items,
+  onStart,
+  children,
+}: {
+  id?: string;
+  title: string;
+  desc: string;
+  items: Item[];
+  onStart: (a: CareAction) => void;
+  children?: React.ReactNode;
+}) {
+  return (
+    <SectionCard {...(id ? { id } : {})} title={title} desc={desc}>
+      <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        {items.map(({ action: a, when }) => (
+          <li key={`${a.id}-${when}`}>
+            <button
+              onClick={() => onStart(a)}
+              className="flex w-full items-center gap-3 rounded-2xl border border-border px-4 py-3.5 text-left transition-colors hover:bg-secondary"
+            >
+              <span className="text-xl" aria-hidden>
+                {a.emoji}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{a.title}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {when} · {a.desc}
+                </span>
+              </span>
+              <Play className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          </li>
+        ))}
+      </ul>
+      {children}
+    </SectionCard>
   );
 }
