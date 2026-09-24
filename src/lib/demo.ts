@@ -24,6 +24,7 @@ const ROWS: Row[] = [
   ["d", 3, 14, 20, "calm", 3, ["relationship"], "中午和同事一起吃饭，聊得很开心。", "social", { title: "稳稳的幸福", artist: "陈奕迅" }],
   ["e", 3, 20, 40, "anxious", 3, ["study"], "论文还有一章没写，越想越着急。", "study"],
   ["f", 4, 23, 10, "anxious", 5, ["work", "sleep"], "睡不着，一直在想项目的截止时间。", "bed"],
+  ["j", 4, 9, 30, "irritated", 3, ["sleep"], "没睡好，早上起来就很烦。", "rest"],
   ["g", 5, 16, 0, "anxious", 3, [], "下午有点心慌，说不上来为什么。", "work"],
   ["h", 5, 19, 30, "sad", 3, ["relationship"], "和朋友有点误会，心里闷闷的。", "rest"],
   ["i", 6, 10, 0, "okay", 3, [], "周末睡了个懒觉，慢慢吃了早饭。", "eat", { title: "晴天", artist: "周杰伦" }],

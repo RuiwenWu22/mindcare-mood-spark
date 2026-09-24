@@ -13,6 +13,7 @@ import {
   type EditResult,
 } from "@/lib/cycle";
 import { dayKey } from "@/lib/mood";
+import { ValenceRows } from "@/components/section";
 
 const md = (d: string) => `${Number(d.slice(5, 7))} 月 ${Number(d.slice(8, 10))} 日`;
 
@@ -159,35 +160,10 @@ export function CycleCard() {
             )}
 
             <h3 className="mt-5 text-sm font-medium">周期和情绪</h3>
-            <ul className="mt-3 space-y-3">
-              {buckets.map((b) => (
-                <li key={b.key}>
-                  <div className="flex items-baseline justify-between text-sm">
-                    <span>
-                      {b.emoji} {b.label}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{b.records} 条记录</span>
-                  </div>
-                  <div
-                    className="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-secondary"
-                    title={`舒展 ${b.bright} · 一般 ${b.records - b.bright - b.heavy} · 偏消耗 ${b.heavy}`}
-                  >
-                    {b.records > 0 && (
-                      <>
-                        <span style={{ width: `${(b.bright / b.records) * 100}%`, backgroundColor: "var(--mood-calm)" }} />
-                        <span
-                          style={{
-                            width: `${((b.records - b.bright - b.heavy) / b.records) * 100}%`,
-                            backgroundColor: "var(--mood-neutral)",
-                          }}
-                        />
-                        <span style={{ width: `${(b.heavy / b.records) * 100}%`, backgroundColor: "var(--mood-anxious)" }} />
-                      </>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <ValenceRows
+              className="mt-3"
+              rows={buckets.map((b) => ({ ...b, neutral: b.records - b.bright - b.heavy }))}
+            />
             <p className="mt-3 text-sm text-foreground/85">
               {finding
                 ? finding.sentence
