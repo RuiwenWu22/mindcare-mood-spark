@@ -3,7 +3,9 @@ import { useState } from "react";
 import { Download, Phone, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useEntries } from "@/hooks/use-entries";
-import { downloadCsv, entryDay, isSample, type CsvDayInfo } from "@/lib/mood";
+import { downloadCsv, entryDay, type CsvDayInfo } from "@/lib/mood";
+import { loadInterventions } from "@/lib/interventions";
+import { Link } from "@tanstack/react-router";
 import { csvDayInfo, loadBody } from "@/lib/body";
 import { csvCycleInfo, loadCycle } from "@/lib/cycle";
 import { useCycle } from "@/hooks/use-cycle";
@@ -31,11 +33,12 @@ const PAINS = [
 ];
 
 const DECISIONS: [string, string][] = [
-  ["5 秒完成记录", "只有“选一个情绪”是必填，强度、场景、原因和文字都可以跳过。"],
-  ["点选代替长文字", "触发因素和场景都是标签，不写字也能得到分析。"],
-  ["记录后只给一个首选", "紧绷或低落时先照顾身体（呼吸），舒展时延续状态（背景声），并说明为什么推荐。"],
-  ["做完再评一次", "记下调节前后的强度，用你自己的数据验证什么方法有效。"],
-  ["洞察附带依据", "每条结论都能展开，看到它来自哪些记录。"],
+  ["十秒完成记录", "首页点一个情绪就弹出记录层：选强度（1–5）必填，原因标签和一句话都可以跳过。"],
+  ["记完不关窗", "同一个弹层里接着出现 AI 整理和一个明确推荐，不用跳转页面。"],
+  ["一个页面只有一个主按钮", "记录下来、开始 2 分钟……每一步只有一个最重要的动作，其余都是次要选项。"],
+  ["做完再评一次", "每次调节都记下前后的强度、方式和时长，用你自己的数据验证什么方法有效。"],
+  ["洞察先给结论，再给数据", "先说「AI 本周发现」和「什么对我有效」，图表放在后面；每条结论都能展开看依据。"],
+  ["示例不写入你的记录", "新用户可以直接看示例洞察，示例只在页面里显示，不会混进你的数据。"],
   [
     "把身体数据放进来",
     "借鉴健康 App：睡眠和活动量是影响情绪的重要因素。首页一键记录，也可以用 iPhone 快捷指令同步步数和锻炼时间。",
@@ -59,26 +62,25 @@ const DECISIONS: [string, string][] = [
 ];
 
 const LOOP: [string, string][] = [
-  ["记录", "情绪、强度、场景、原因"],
-  ["理解", "触发因素、时段和场景的规律"],
-  ["行动", "一个现在就能做的首选方式"],
+  ["记录", "情绪、强度（1–5）、可能的原因"],
+  ["理解", "AI 整理这次的情绪可能来自哪里"],
+  ["行动", "一个现在就能做的推荐"],
   ["反馈", "做完再评一次强度"],
   ["学习", "下次优先推荐对你有效的方法"],
 ];
 
 function AboutPage() {
-  const { entries, ready, clearAll, restoreSamples } = useEntries();
+  const { entries, ready, clearAll } = useEntries();
   const [confirming, setConfirming] = useState(false);
   const [withCycle, setWithCycle] = useState(false);
   const cycle = useCycle();
-  const sampleCount = entries.filter(isSample).length;
 
   return (
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-3xl font-semibold tracking-tight">关于 MindCare</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          一个低门槛的情绪日记与自我关怀工具。这里写下它为什么这样设计、你的数据如何处理，以及需要帮助时可以找谁。
+          一个低门槛的情绪记录与自我关怀工具：记录情绪，AI 帮你理解触发因素、推荐调节方式，并从每次调节的反馈里慢慢发现什么对你有效。这里写下它为什么这样设计、你的数据如何处理，以及需要帮助时可以找谁。
         </p>
       </header>
 
@@ -120,9 +122,9 @@ function AboutPage() {
           ))}
         </dl>
 
-        <h3 className="mt-8 text-sm font-semibold">为什么现在用规则，而不是大模型</h3>
+        <h3 className="mt-8 text-sm font-semibold">「AI」现在是怎么工作的</h3>
         <p className="mt-3 text-sm leading-relaxed text-foreground/85">
-          现阶段的分析和推荐全部由可解释的规则完成：每条结论都能追溯到具体记录；计算在你的浏览器里完成，记录不需要离开你的设备；行为是确定的，安全兜底不依赖模型有没有“答对”。
+          「AI 帮你整理了一下」「AI 本周发现」目前由可解释的规则完成，没有使用大模型：从你选的标签和写下的关键词（比如“汇报”“没准备好”）判断情绪可能来自哪里，从最近 7 天的记录里统计时段和原因的规律。每条结论都能展开「为什么这样判断？」看到依据；数据不够时不下结论。计算在你的浏览器里完成，记录不需要离开你的设备；安全兜底不依赖模型有没有“答对”。
         </p>
         <p className="mt-3 text-sm leading-relaxed text-foreground/85">
           大模型最适合放在两个位置：从你写的一句话里理解触发因素，以及生成更贴合语境的回应。接入时的护栏是：危机识别在模型之前独立运行；模型出错时回退到规则；不做诊断、不给医疗建议；只有在你同意后才发送文字内容。
@@ -132,7 +134,7 @@ function AboutPage() {
         <ul className="mt-3 space-y-2 text-sm leading-relaxed text-foreground/85">
           <li>· 不做诊断，也不提供治疗。</li>
           <li>· 文字里出现伤害自己的信号时，用支持卡片替换普通推荐，并提供 {HOTLINE.number}；记录照常保存，不拦截、不说教。</li>
-          <li>· 负向情绪强度达到 9 分以上时，在推荐里附上求助提示。</li>
+          <li>· 负向情绪强度达到 5 / 5 时，在推荐里附上求助提示。</li>
           <li>· 最近 24 小时内的记录有危机信号或很强烈的负面情绪时，今日卡片整张换成支持性内容，不出现星座、穿搭和计划。</li>
           <li>· 星座和主题色只作趣味参考，不预测运势，也不评价好坏。</li>
           <li>· 关键词识别一定会有漏判，所以每个页面底部都常驻求助信息。</li>
@@ -160,7 +162,7 @@ function AboutPage() {
           <div>
             <dt className="font-medium">你的记录存在哪里</dt>
             <dd className="mt-1 text-foreground/80">
-              情绪记录、睡眠、活动数据、周期记录和你填写的歌曲，都只保存在这台设备的浏览器里。换设备或换浏览器看不到；清除浏览器数据会一起删除。
+              情绪记录、调节前后的分数、睡眠、活动数据、周期记录和你填写的歌曲，都只保存在这台设备的浏览器里。换设备或换浏览器看不到；清除浏览器数据会一起删除。
             </dd>
           </div>
           <div>
@@ -196,7 +198,7 @@ function AboutPage() {
         <div className="mt-6 rounded-2xl bg-secondary/60 px-5 py-5">
           <p className="text-sm">
             {ready
-              ? `目前共有 ${entries.length} 条记录${sampleCount ? `，其中 ${sampleCount} 条是示例` : ""}。`
+              ? `目前共有 ${entries.length} 条记录。`
               : "正在读取你的记录……"}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -209,7 +211,7 @@ function AboutPage() {
                     info[d] = { ...info[d], ...c };
                   }
                 }
-                downloadCsv(entries, info);
+                downloadCsv(entries, info, loadInterventions());
                 toast("情绪记录已导出为 CSV 🌿");
               }}
               disabled={!ready || entries.length === 0}
@@ -217,15 +219,13 @@ function AboutPage() {
             >
               <Download className="h-4 w-4" /> 导出我的记录
             </button>
-            <button
-              onClick={() => {
-                restoreSamples();
-                toast("示例记录已载入，你自己的记录都还在");
-              }}
+            <Link
+              to="/insights"
+              search={{ demo: 1 }}
               className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-secondary"
             >
-              <RotateCcw className="h-4 w-4" /> {sampleCount ? "重新载入示例" : "载入示例记录"}
-            </button>
+              <RotateCcw className="h-4 w-4" /> 看看示例洞察
+            </Link>
             {!confirming && (
               <button
                 onClick={() => setConfirming(true)}
@@ -245,7 +245,7 @@ function AboutPage() {
           {confirming && (
             <div className="mt-4 rounded-2xl border border-destructive/40 bg-card px-4 py-4" role="alertdialog">
               <p className="text-sm">
-                确定删除全部 {entries.length} 条记录吗？睡眠、活动、周期记录和今日卡片的设置也会一起删除，无法恢复，建议先导出。
+                确定删除全部 {entries.length} 条记录吗？调节记录、睡眠、活动、周期记录和今日卡片的设置也会一起删除，无法恢复，建议先导出。
               </p>
               <div className="mt-3 flex gap-2">
                 <button

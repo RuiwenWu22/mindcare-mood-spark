@@ -1,7 +1,7 @@
 /**
- * 安全兜底：在每次保存记录时运行，独立于任何推荐或（未来的）AI 逻辑。
+ * 安全兜底：在每次保存记录时运行，先于 AI 整理和推荐，独立于它们。
  * - crisis：文字里出现伤害自己的信号 → 用支持卡片替换普通推荐
- * - elevated：负向情绪且强度 ≥ 9 → 普通推荐之外，温和补充求助入口
+ * - elevated：负向情绪且强度达到 5 / 5 → 普通推荐之外，温和补充求助入口
  * 关键词检测一定会有漏判和误判，这里宁可多提示一次，也不拦截保存、不制造恐慌。
  */
 
@@ -35,7 +35,7 @@ export function hasCrisisSignal(note: string): boolean {
 
 export function assessRisk(input: { valence: number; intensity: number; note: string }): Risk {
   if (hasCrisisSignal(input.note)) return "crisis";
-  if (input.valence < 0 && input.intensity >= 9) return "elevated";
+  if (input.valence < 0 && input.intensity >= 5) return "elevated";
   return "normal";
 }
 

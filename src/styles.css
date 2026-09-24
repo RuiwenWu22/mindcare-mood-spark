@@ -220,3 +220,44 @@
 @utility animate-rise {
   animation: rise 0.45s ease both;
 }
+
+/* Level 2：AI 内容。非常浅的绿色，比普通卡片稍突出，不用渐变和高饱和色 */
+@utility ai-card {
+  background-color: color-mix(in oklab, var(--color-primary-soft) 70%, var(--color-card));
+  border: 1px solid color-mix(in oklab, var(--color-primary) 22%, transparent);
+  border-radius: var(--radius-2xl);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@utility animate-sheet {
+  animation: sheet-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility animate-fade {
+  animation: fade-in 0.25s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet,
+  .animate-fade,
+  .animate-rise {
+    animation: none;
+  }
+}

@@ -4,7 +4,7 @@
  * - 活动：iPhone 快捷指令读取健康数据后，通过 /sync#steps=... 带进来；也可以手动选
  * 快捷指令把数据放在链接的 # 后面，浏览器不会把这部分发给服务器；读取后立即从地址栏清除。
  */
-import { dayKey, entryDay, isSample, loadEntries, moodOf, type Entry, type ExtraFindings } from "@/lib/mood";
+import { dayKey, entryDay, moodOf, type Entry, type ExtraFindings } from "@/lib/mood";
 
 export type SleepQuality = "good" | "ok" | "poor";
 export type ActivityLevel = "low" | "mid" | "high";
@@ -49,33 +49,6 @@ export const activityLevelOf = (log?: DayLog): ActivityLevel | undefined =>
 const KEY = "mindcare.body.v1";
 export const BODY_EVENT = "mindcare:body-changed";
 
-const daysAgoKey = (n: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return dayKey(d);
-};
-
-/** 示例数据对应的 7 天：和示例情绪记录放在一起看，才能看出睡眠、活动与心情的关系 */
-export function sampleBodyLogs(): DayLog[] {
-  const rows: [number, SleepQuality, number, number][] = [
-    [0, "good", 6200, 25],
-    [1, "poor", 3100, 5],
-    [2, "poor", 2400, 0],
-    [3, "good", 11800, 45],
-    [4, "ok", 7600, 20],
-    [5, "ok", 3500, 10],
-    [6, "poor", 5200, 15],
-  ];
-  return rows.map(([n, sleep, steps, exercise]) => ({
-    date: daysAgoKey(n),
-    sleep,
-    steps,
-    exercise,
-    source: "shortcut",
-    sample: true,
-  }));
-}
-
 function isValidLog(x: unknown): x is DayLog {
   if (!x || typeof x !== "object") return false;
   const r = x as Record<string, unknown>;
@@ -86,14 +59,14 @@ export function loadBody(): DayLog[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(KEY);
-    if (!raw) {
-      // 第一次打开：只有当情绪记录里还有示例数据时，才一起放入示例的身体数据
-      const seeded = loadEntries().some(isSample) ? sampleBodyLogs() : [];
-      window.localStorage.setItem(KEY, JSON.stringify(seeded));
-      return seeded;
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? parsed.filter(isValidLog) : [];
+    if (!Array.isArray(parsed)) return [];
+    const logs = parsed.filter(isValidLog);
+    // 旧版本自动填入的示例数据不再保存在本机，示例改为不落盘的演示模式
+    const own = logs.filter((l) => !l.sample);
+    if (own.length !== logs.length) window.localStorage.setItem(KEY, JSON.stringify(own));
+    return own;
   } catch {
     return [];
   }
@@ -127,13 +100,7 @@ export function unsetDayField(date: string, field: "sleep" | "level") {
   saveBody(logs);
 }
 
-export const clearSampleBody = () => saveBody(loadBody().filter((l) => !l.sample));
 export const clearBody = () => saveBody([]);
-export function restoreSampleBody() {
-  const own = loadBody().filter((l) => !l.sample);
-  const ownDays = new Set(own.map((l) => l.date));
-  saveBody([...own, ...sampleBodyLogs().filter((l) => !ownDays.has(l.date))]);
-}
 
 /* ---------------- 快捷指令同步 ---------------- */
 

@@ -367,8 +367,8 @@ export function stopAmbient() {
   setState(IDLE);
 }
 
-/** 返回是否成功开始播放 */
-export function playAmbient(id: AmbientId): boolean {
+/** 返回是否成功开始播放；minutes 不填时用这段声音的默认时长 */
+export function playAmbient(id: AmbientId, minutes: number = AMBIENT_TRACKS[id].minutes): boolean {
   const ac = getContext();
   if (!ac) return false;
   void ac.resume();
@@ -383,7 +383,6 @@ export function playAmbient(id: AmbientId): boolean {
   AMBIENT_BUILDERS[id](ac, session);
   current = session;
 
-  const minutes = AMBIENT_TRACKS[id].minutes;
   autoStopTimer = window.setTimeout(stopAmbient, minutes * 60_000);
   setState({ playing: id, endsAt: Date.now() + minutes * 60_000 });
   return true;

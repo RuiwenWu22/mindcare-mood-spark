@@ -3,18 +3,11 @@
  * 边界：
  * - 最近 24 小时内你自己的记录有危机信号或很强烈的负面情绪时，整张卡片换成支持性内容
  * - 星座只提供主题和主题色（趣味参考），不预测、不评价运势
- * - 一签的建议可以引用示例数据，但会写明；小计划只用你自己的数据（示例说明不了你的今天）
+ * - 一签的建议和小计划都只用你自己的数据
  */
-import {
-  activityStats,
-  dayKey,
-  isSample,
-  moodOf,
-  songsByMood,
-  sortByNewest,
-  whatWorks,
-  type Entry,
-} from "@/lib/mood";
+import { activityStats, dayKey, isSample, moodOf, songsByMood, sortByNewest, type Entry } from "@/lib/mood";
+import { methodHistory } from "@/lib/care-recs";
+import type { Intervention } from "@/lib/interventions";
 import { activityLevelOf, bodyFindings, sleepOf, type DayLog } from "@/lib/body";
 import { assessRisk } from "@/lib/safety";
 import { accessoryFor, isSignKey, signOf, themeFor, type SignKey } from "@/lib/zodiac";
@@ -137,6 +130,8 @@ export function buildDailyCard(input: {
   logs: DayLog[];
   profile: Profile;
   weather: Weather | null;
+  /** 你自己的调节记录 */
+  interventions?: Intervention[];
   /** 只有开启了周期记录时才传入 */
   periods?: Period[];
   now?: Date;
@@ -167,38 +162,28 @@ export function buildDailyCard(input: {
 
   // 3) 一签的建议：来自记录，你自己的数据优先，示例数据会写明
   const candidates: { text: string; ev: string }[] = [];
-  const ownBest = whatWorks(own).find((m) => m.avgDrop >= 1);
-  const best = ownBest ?? whatWorks(input.entries.filter(isSample)).find((m) => m.avgDrop >= 1);
-  if (best) {
+  const ownBest = methodHistory(own, input.interventions ?? []).find((m) => m.avgDrop >= 1);
+  if (ownBest) {
     candidates.push({
-      text: `紧绷的时候，先试试「${best.label}」。`,
-      ev: `${ownBest ? "在你的记录里" : "在示例记录里"}，它平均让强度下降 ${best.avgDrop}（${best.count} 次）。`,
+      text: `紧绷的时候，可以先试试「${ownBest.name}」。`,
+      ev: `在你的记录里，它平均让强度下降 ${ownBest.avgDrop}（${ownBest.count} 次）。`,
     });
   }
-  const bright = activityStats(input.entries).find((s) => s.count >= 2 && s.bright / s.count >= 0.6);
+  const bright = activityStats(own).find((s) => s.count >= 2 && s.bright / s.count >= 0.6);
   if (bright) {
-    const hasSample = input.entries.some((e) => e.activity === bright.key && isSample(e));
     candidates.push({
       text: `今天可以留一点时间给「${bright.label}」。`,
-      ev: `场景为「${bright.label}」的 ${bright.count} 条记录里，${bright.bright} 条是舒展的${hasSample ? "（含示例记录）" : ""}。`,
+      ev: `场景为「${bright.label}」的 ${bright.count} 条记录里，${bright.bright} 条是舒展的。`,
     });
   }
-  const songs = songsByMood(input.entries).bright;
-  const song = songs.find((s) => !s.sampleOnly) ?? songs[0];
+  const song = songsByMood(own).bright[0];
   if (song) {
     candidates.push({
       text: `需要一点亮色的时候，听听《${song.title}》。`,
-      ev: song.sampleOnly ? "示例记录里，心情舒展的时候听过这首。" : "你心情舒展的时候听过这首。",
+      ev: "你心情舒展的时候听过这首。",
     });
   }
-  // 睡眠规律：先看你自己的数据，没有时才用示例，并写明
-  const ownSleepEv = bodyFindings(own, ownLogs).evidence.find((e) => e.startsWith("睡得"));
-  const sampleSleepEv = ownSleepEv
-    ? undefined
-    : bodyFindings(input.entries.filter(isSample), input.logs.filter((l) => l.sample)).evidence.find((e) =>
-        e.startsWith("睡得"),
-      );
-  const sleepEv = ownSleepEv ?? (sampleSleepEv ? `示例记录里，${sampleSleepEv}` : undefined);
+  const sleepEv = bodyFindings(own, ownLogs).evidence.find((e) => e.startsWith("睡得"));
   if (sleepEv) {
     candidates.push({ text: "今晚早点休息：睡得好的日子，心情通常更轻松。", ev: sleepEv });
   }
@@ -271,7 +256,7 @@ export function buildDailyCard(input: {
   if (ownBest) {
     data.push({
       id: "best",
-      title: `紧绷时，先做一次「${ownBest.label}」`,
+      title: `紧绷时，先做一次「${ownBest.name}」`,
       why: `它曾让你的强度平均下降 ${ownBest.avgDrop}`,
       action: { label: "去做", href: "/care", external: false },
     });

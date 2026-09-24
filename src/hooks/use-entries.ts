@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { clearBody, clearSampleBody, restoreSampleBody } from "@/lib/body";
+import { clearBody } from "@/lib/body";
 import { clearCycle } from "@/lib/cycle";
 import { clearDailyData } from "@/lib/daily";
 import { clearWeatherCache } from "@/lib/weather";
+import { clearInterventions, removeInterventionsFor } from "@/lib/interventions";
 import type { Song } from "@/lib/songs";
 import {
   loadEntries,
   saveEntries,
   sortByNewest,
-  isSample,
-  seedEntries,
   type ActivityKey,
   type Entry,
-  type FollowUp,
   type MoodKey,
   type TriggerKey,
   detectTriggers,
@@ -58,9 +56,10 @@ export function useEntries() {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         createdAt: new Date().toISOString(),
         mood: input.mood,
-        intensity: input.intensity,
+        intensity: Math.min(5, Math.max(1, Math.round(input.intensity))),
         note: input.note.trim(),
         triggers,
+        scale: 5,
         ...(input.activity ? { activity: input.activity } : {}),
         ...(input.song?.title ? { song: input.song } : {}),
       };
@@ -70,50 +69,24 @@ export function useEntries() {
     [commit],
   );
 
+  /** 删除一条记录，以及和它关联的调节记录 */
   const removeEntry = useCallback(
-    (id: string) => commit(loadEntries().filter((e) => e.id !== id)),
+    (id: string) => {
+      commit(loadEntries().filter((e) => e.id !== id));
+      removeInterventionsFor(id);
+    },
     [commit],
   );
 
-  /** 清空示例数据，只保留用户自己的记录（之后不会再自动填入示例） */
-  const clearSamples = useCallback(() => {
-    commit(loadEntries().filter((e) => !isSample(e)));
-    clearSampleBody();
-  }, [commit]);
-
-  const addFollowUp = useCallback(
-    (id: string, followUp: FollowUp) =>
-      commit(
-        loadEntries().map((e) =>
-          e.id === id ? { ...e, followUps: [...(e.followUps ?? []), followUp] } : e,
-        ),
-      ),
-    [commit],
-  );
-
-  /** 删除全部记录（包括示例），之后不会再自动填入示例 */
+  /** 删除全部数据：记录、调节记录、身体数据、周期、今日卡片设置 */
   const clearAll = useCallback(() => {
     commit([]);
+    clearInterventions();
     clearBody();
     clearDailyData();
     clearWeatherCache();
     clearCycle();
   }, [commit]);
 
-  /** 重新载入示例数据，保留用户自己的记录 */
-  const restoreSamples = useCallback(() => {
-    commit([...loadEntries().filter((e) => !isSample(e)), ...seedEntries()]);
-    restoreSampleBody();
-  }, [commit]);
-
-  return {
-    entries,
-    ready,
-    addEntry,
-    removeEntry,
-    clearSamples,
-    addFollowUp,
-    clearAll,
-    restoreSamples,
-  };
+  return { entries, ready, addEntry, removeEntry, clearAll };
 }
