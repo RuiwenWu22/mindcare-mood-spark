@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { Download, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { BottomSheet } from "@/components/bottom-sheet";
@@ -13,8 +13,10 @@ import { csvDayInfo, loadBody } from "@/lib/body";
 import { understandEntry } from "@/lib/understand";
 import type { Intervention } from "@/lib/interventions";
 import { cn } from "@/lib/utils";
+import { demoData } from "@/lib/demo";
 
 export const Route = createFileRoute("/journal")({
+  validateSearch: (s: Record<string, unknown>): { demo?: 1 } => (s["demo"] === 1 || s["demo"] === "1" ? { demo: 1 } : {}),
   head: () => ({
     meta: [
       { title: "记录｜MindCare" },
@@ -46,9 +48,21 @@ const timeOf = (iso: string) => {
 };
 
 function RecordsPage() {
-  const { entries, ready, removeEntry } = useEntries();
-  const { interventions } = useInterventions();
+  const { demo } = Route.useSearch();
+  const real = useEntries();
+  const realIv = useInterventions();
+  const { removeEntry } = real;
   const { open } = useRecordSheet();
+  // 示例记录只在浏览器里生成，不写入本机记录
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => setNow(new Date()), []);
+  const sample = useMemo(() => (demo && now ? demoData(now) : null), [demo, now]);
+  const entries = useMemo(
+    () => (sample ? [...sample.entries].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : real.entries),
+    [sample, real.entries],
+  );
+  const interventions = sample?.interventions ?? realIv.interventions;
+  const ready = demo ? !!sample : real.ready;
   const [moodFilter, setMoodFilter] = useState<MoodKey | null>(null);
   const [detail, setDetail] = useState<string | null>(null);
 
@@ -75,10 +89,14 @@ function RecordsPage() {
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">记录</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {ready ? `一共 ${entries.length} 条。点开一条，可以看到 AI 的整理和调节前后的变化。` : "正在读取你的记录……"}
+            {!ready
+              ? "正在读取你的记录……"
+              : entries.length === 0
+                ? "还没有记录。"
+                : `${demo ? "示例共" : "一共"} ${entries.length} 条。点开一条，可以看到 AI 的整理和调节前后的变化。`}
           </p>
         </div>
-        {entries.length > 0 && (
+        {!demo && entries.length > 0 && (
           <div className="flex gap-2">
             <button
               onClick={() => open()}
@@ -101,6 +119,15 @@ function RecordsPage() {
         )}
       </header>
 
+      {demo && (
+        <div className="sticky top-[4.5rem] z-20 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-primary/50 bg-card/95 px-4 py-3 backdrop-blur">
+          <p className="text-sm font-medium">示例数据 · 不会保存到你的记录</p>
+          <Link to="/journal" className="shrink-0 text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground">
+            退出示例
+          </Link>
+        </div>
+      )}
+
       {!ready && (
         <div className="space-y-3">
           <Placeholder className="h-20 w-full" />
@@ -112,12 +139,21 @@ function RecordsPage() {
         <div className="card-soft px-6 py-12 text-center">
           <p className="font-display text-lg">这里还很安静</p>
           <p className="mt-2 text-sm text-muted-foreground">记下第一条感受后，会按天出现在这里。</p>
-          <button
-            onClick={() => open()}
-            className="mt-6 rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)]"
-          >
-            记录今天的情绪
-          </button>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <button
+              onClick={() => open()}
+              className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)]"
+            >
+              记录今天的情绪
+            </button>
+            <Link
+              to="/journal"
+              search={{ demo: 1 }}
+              className="rounded-full border border-border bg-card px-6 py-3 text-sm font-medium transition-colors hover:bg-secondary"
+            >
+              看看示例记录
+            </Link>
+          </div>
         </div>
       )}
 
@@ -189,11 +225,15 @@ function RecordsPage() {
             entry={current}
             history={entries.filter((e) => e.id !== current.id)}
             interventions={ivOf(current.id)}
-            onDelete={() => {
-              removeEntry(current.id);
-              setDetail(null);
-              toast("这条记录已经删除");
-            }}
+            {...(demo
+              ? {}
+              : {
+                  onDelete: () => {
+                    removeEntry(current.id);
+                    setDetail(null);
+                    toast("这条记录已经删除");
+                  },
+                })}
           />
         )}
       </BottomSheet>
@@ -210,7 +250,8 @@ function RecordDetail({
   entry: Entry;
   history: Entry[];
   interventions: Intervention[];
-  onDelete: () => void;
+  /** 不传时（示例记录）不显示删除 */
+  onDelete?: () => void;
 }) {
   const [confirm, setConfirm] = useState(false);
   const mood = moodOf(entry.mood);
@@ -291,7 +332,9 @@ function RecordDetail({
       </div>
 
       <div className="border-t border-border/70 pt-4 text-sm">
-        {!confirm ? (
+        {!onDelete ? (
+          <p className="text-xs text-muted-foreground">这是一条示例记录，不会保存到你的记录。</p>
+        ) : !confirm ? (
           <button onClick={() => setConfirm(true)} className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-destructive">
             <Trash2 className="h-4 w-4" /> 删除这条记录
           </button>
