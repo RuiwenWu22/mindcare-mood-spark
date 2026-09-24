@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useEntries } from "@/hooks/use-entries";
 import { useBody } from "@/hooks/use-body";
 import { useDaily } from "@/hooks/use-daily";
+import { useCycle } from "@/hooks/use-cycle";
 import { buildDailyCard, weekendLinks, type PlanItem } from "@/lib/daily";
 import { SLEEP_OPTIONS } from "@/lib/body";
 import { CITIES, cityOf, getWeather, type Weather } from "@/lib/weather";
@@ -20,6 +21,7 @@ export function TodayCard({ onWriteNote }: { onWriteNote: () => void }) {
   const { entries, ready: entriesReady, addFollowUp } = useEntries();
   const { logs, ready: bodyReady, today: todayLog, update: updateBody } = useBody();
   const { profile, state, ready: dailyReady, setProfileAll, updateState } = useDaily();
+  const cycle = useCycle();
   const [weather, setWeather] = useState<Weather | null>(null);
   const [wStatus, setWStatus] = useState<WeatherStatus>("idle");
   const [picking, setPicking] = useState(false);
@@ -48,12 +50,13 @@ export function TodayCard({ onWriteNote }: { onWriteNote: () => void }) {
   }, [profile.city]);
 
   const card = useMemo(
-    () => buildDailyCard({ entries, logs, profile, weather }),
-    [entries, logs, profile, weather],
+    () =>
+      buildDailyCard({ entries, logs, profile, weather, ...(cycle.enabled ? { periods: cycle.periods } : {}) }),
+    [entries, logs, profile, weather, cycle.enabled, cycle.periods],
   );
 
   const shell = "card-soft px-6 py-7 sm:px-8";
-  if (!entriesReady || !bodyReady || !dailyReady) {
+  if (!entriesReady || !bodyReady || !dailyReady || !cycle.ready) {
     return (
       <section className={shell} aria-label="今日卡片">
         <p className="text-xs tracking-[0.3em] text-muted-foreground">今 日</p>
@@ -157,6 +160,7 @@ export function TodayCard({ onWriteNote }: { onWriteNote: () => void }) {
         {card.theme && <p className="mt-1.5 text-sm text-foreground/85">{card.theme.line}</p>}
         <p className={cn("text-base leading-relaxed", card.theme ? "mt-3" : "mt-3 font-display text-lg")}>{card.advice}</p>
         {card.sleepLine && <p className="mt-2 text-sm text-foreground/80">{card.sleepLine}</p>}
+        {card.cycleLine && <p className="mt-2 text-sm text-foreground/80">{card.cycleLine}</p>}
 
         <button
           onClick={() => setWhyOpen((v) => !v)}

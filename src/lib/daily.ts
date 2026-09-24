@@ -19,6 +19,7 @@ import { activityLevelOf, bodyFindings, sleepOf, type DayLog } from "@/lib/body"
 import { assessRisk } from "@/lib/safety";
 import { accessoryFor, isSignKey, signOf, themeFor, type SignKey } from "@/lib/zodiac";
 import { clothesFor, describeSky, goodForOutdoors, type Weather } from "@/lib/weather";
+import { cycleNote, type Period } from "@/lib/cycle";
 
 /* ---------------- 个人设置与当天状态（只存本机） ---------------- */
 
@@ -107,6 +108,7 @@ export type DailyCard =
       theme?: { signName: string; symbol: string; title: string; line: string; color: string; hex: string };
       advice: string;
       sleepLine?: string;
+      cycleLine?: string;
       evidence: string[];
       outfit: { color?: { name: string; hex: string }; clothes?: string[]; accessory?: string; sky?: string };
       plan: PlanItem[];
@@ -135,6 +137,8 @@ export function buildDailyCard(input: {
   logs: DayLog[];
   profile: Profile;
   weather: Weather | null;
+  /** 只有开启了周期记录时才传入 */
+  periods?: Period[];
   now?: Date;
 }): DailyCard {
   const now = input.now ?? new Date();
@@ -142,11 +146,12 @@ export function buildDailyCard(input: {
   const own = sortByNewest(input.entries.filter((e) => !isSample(e)));
   const ownLogs = input.logs.filter((l) => !l.sample);
 
-  // 1) 安全优先：最近 24 小时内的记录很沉重时，不做一签、穿搭和计划
+  // 1) 安全优先：最近 24 小时内任何一条记录很沉重，都不做一签、穿搭和计划
+  //    （之后又记了一条轻松的，也不代表危机已经过去）
   const latest = own[0];
-  if (latest && now.getTime() - new Date(latest.createdAt).getTime() < 24 * 3_600_000) {
-    const risk = assessRisk({ valence: moodOf(latest.mood).valence, intensity: latest.intensity, note: latest.note });
-    if (risk !== "normal") return { mode: "support" };
+  const recent = own.filter((e) => now.getTime() - new Date(e.createdAt).getTime() < 24 * 3_600_000);
+  if (recent.some((e) => assessRisk({ valence: moodOf(e.mood).valence, intensity: e.intensity, note: e.note }) !== "normal")) {
+    return { mode: "support" };
   }
 
   const evidence: string[] = [];
@@ -213,6 +218,16 @@ export function buildDailyCard(input: {
   if (todayLog?.sleep) {
     sleepLine = SLEEP_LINE[todayLog.sleep];
     evidence.push(`今天你选了「睡得${sleepOf(todayLog.sleep).label}」。`);
+  }
+
+  // 4.5) 周期提醒：只在开启了周期记录、且规律已经稳定（或正在经期中）时出现
+  let cycleLine: string | undefined;
+  if (input.periods) {
+    const c = cycleNote(input.periods, today);
+    if (c) {
+      cycleLine = c.line;
+      evidence.push(c.evidence);
+    }
   }
 
   // 5) 穿搭：主题色来自星座，衣服来自天气
@@ -287,6 +302,7 @@ export function buildDailyCard(input: {
     ...(theme ? { theme } : {}),
     advice,
     ...(sleepLine ? { sleepLine } : {}),
+    ...(cycleLine ? { cycleLine } : {}),
     evidence,
     outfit,
     plan: plan.slice(0, 3),

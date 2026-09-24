@@ -3,8 +3,10 @@ import { useState } from "react";
 import { Download, Phone, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useEntries } from "@/hooks/use-entries";
-import { downloadCsv, isSample } from "@/lib/mood";
+import { downloadCsv, entryDay, isSample, type CsvDayInfo } from "@/lib/mood";
 import { csvDayInfo, loadBody } from "@/lib/body";
+import { csvCycleInfo, loadCycle } from "@/lib/cycle";
+import { useCycle } from "@/hooks/use-cycle";
 import { HOTLINE } from "@/lib/safety";
 
 export const Route = createFileRoute("/about")({
@@ -43,6 +45,10 @@ const DECISIONS: [string, string][] = [
     "借鉴测测的每日仪式感：翻开今日一签，看到星座主题（趣味参考）和来自你记录的建议；再加上按天气给的穿搭，以及最多 3 件、做不完也没关系的小计划。最近的记录很沉重时，整张卡片换成支持性内容。",
   ],
   [
+    "周期记录（可选）",
+    "默认关闭，不问性别。积累两个完整周期后才提示你自己的规律，变化明显时建议就医；只存本机，可以单独删除，导出时默认不包含。",
+  ],
+  [
     "此刻的 BGM",
     "听歌是年轻人最常见的调节方式之一。只记录你主动分享的歌，不读取听歌记录，也不从歌推断心情。",
   ],
@@ -63,6 +69,8 @@ const LOOP: [string, string][] = [
 function AboutPage() {
   const { entries, ready, clearAll, restoreSamples } = useEntries();
   const [confirming, setConfirming] = useState(false);
+  const [withCycle, setWithCycle] = useState(false);
+  const cycle = useCycle();
   const sampleCount = entries.filter(isSample).length;
 
   return (
@@ -125,18 +133,23 @@ function AboutPage() {
           <li>· 不做诊断，也不提供治疗。</li>
           <li>· 文字里出现伤害自己的信号时，用支持卡片替换普通推荐，并提供 {HOTLINE.number}；记录照常保存，不拦截、不说教。</li>
           <li>· 负向情绪强度达到 9 分以上时，在推荐里附上求助提示。</li>
+          <li>· 最近 24 小时内的记录有危机信号或很强烈的负面情绪时，今日卡片整张换成支持性内容，不出现星座、穿搭和计划。</li>
+          <li>· 星座和主题色只作趣味参考，不预测运势，也不评价好坏。</li>
           <li>· 关键词识别一定会有漏判，所以每个页面底部都常驻求助信息。</li>
         </ul>
 
         <h3 className="mt-8 text-sm font-semibold">后续规划</h3>
         <ul className="mt-3 space-y-2 text-sm leading-relaxed text-foreground/85">
           <li>
-            · 以微信小程序形式落地：目标用户每天都在微信里，免安装能进一步降低门槛。在用户同意后通过订阅消息发送温和提醒，频率由用户决定，不做连续打卡式的施压。
+            · 微信小程序：目标用户每天都在微信里，免安装能进一步降低门槛。在用户同意后通过订阅消息发送温和提醒，频率由用户决定，不做连续打卡式的施压；在授权后读取微信运动步数。
           </li>
-          <li>· 按上面的方式接入大模型，并带上护栏。</li>
-          <li>· 连接 Apple Music：记录时从最近播放里点选正在听的歌，由你确认，而不是自动推断。</li>
-          <li>· 让背景声和轻运动也能记录前后变化，让“什么对我有效”覆盖更多方法。</li>
-          <li>· 可选的跨设备同步，只在用户明确同意后开启。</li>
+          <li>· 原生 iOS App：通过 HealthKit 读取心情、睡眠、运动和周期数据，不再需要快捷指令。</li>
+          <li>
+            · 接入大模型：用来理解文字里的触发因素、生成贴合语境的回应。危机识别在模型之前独立运行，模型出错时回退到规则。
+          </li>
+          <li>· 心理测评：需要配套的计分解释和转介设计，不会只给一个分数。</li>
+          <li>· 本地活动：与票务平台合作，接入真实的活动数据，替代现在的搜索页跳转。</li>
+          <li>· 跨设备同步：只在用户明确同意后开启。</li>
         </ul>
       </section>
 
@@ -147,7 +160,7 @@ function AboutPage() {
           <div>
             <dt className="font-medium">你的记录存在哪里</dt>
             <dd className="mt-1 text-foreground/80">
-              情绪记录、睡眠、活动数据和你填写的歌曲，都只保存在这台设备的浏览器里。换设备或换浏览器看不到；清除浏览器数据会一起删除。
+              情绪记录、睡眠、活动数据、周期记录和你填写的歌曲，都只保存在这台设备的浏览器里。换设备或换浏览器看不到；清除浏览器数据会一起删除。
             </dd>
           </div>
           <div>
@@ -160,6 +173,12 @@ function AboutPage() {
             <dt className="font-medium">星座、城市和天气</dt>
             <dd className="mt-1 text-foreground/80">
               只保存你选的星座和城市，不保存生日（用生日算星座时，生日只在当下用一次）。选择城市后，会用城市坐标向 Open-Meteo 查询当天天气，不会发送你的任何记录。
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium">周期记录</dt>
+            <dd className="mt-1 text-foreground/80">
+              可选模块，默认关闭，也不会询问性别。开启后只保存每次的开始和结束日期，存在这台设备上；可以在洞察页单独删除，导出时默认不包含，需要你主动勾选。
             </dd>
           </div>
           <div>
@@ -177,7 +196,14 @@ function AboutPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               onClick={() => {
-                downloadCsv(entries, csvDayInfo(loadBody()));
+                const info: CsvDayInfo = csvDayInfo(loadBody());
+                if (withCycle) {
+                  const days = [...new Set(entries.map(entryDay))];
+                  for (const [d, c] of Object.entries(csvCycleInfo(days, loadCycle().periods))) {
+                    info[d] = { ...info[d], ...c };
+                  }
+                }
+                downloadCsv(entries, info);
                 toast("情绪记录已导出为 CSV 🌿");
               }}
               disabled={!ready || entries.length === 0}
@@ -204,9 +230,17 @@ function AboutPage() {
               </button>
             )}
           </div>
+          {cycle.periods.length > 0 && (
+            <label className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={withCycle} onChange={(e) => setWithCycle(e.target.checked)} />
+              导出时包含周期记录（默认不包含）
+            </label>
+          )}
           {confirming && (
             <div className="mt-4 rounded-2xl border border-destructive/40 bg-card px-4 py-4" role="alertdialog">
-              <p className="text-sm">确定删除全部 {entries.length} 条记录吗？删除后无法恢复，建议先导出。</p>
+              <p className="text-sm">
+                确定删除全部 {entries.length} 条记录吗？睡眠、活动、周期记录和今日卡片的设置也会一起删除，无法恢复，建议先导出。
+              </p>
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => {

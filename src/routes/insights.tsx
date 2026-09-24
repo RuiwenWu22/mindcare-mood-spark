@@ -5,6 +5,7 @@ import { useEntries } from "@/hooks/use-entries";
 import { useBody } from "@/hooks/use-body";
 import { bodyFindings, bodyMoodStats, type BodyBucket } from "@/lib/body";
 import { SampleNotice } from "@/components/sample-notice";
+import { CycleCard } from "@/components/cycle-card";
 import {
   activityStats,
   analyzeEntries,
@@ -303,6 +304,8 @@ function InsightsPage() {
           </div>
         )}
       </section>
+
+      <CycleCard />
 
       <section className="card-soft px-6 py-6 sm:px-8">
         <h2 className="font-display text-lg font-semibold">你的情绪歌单</h2>

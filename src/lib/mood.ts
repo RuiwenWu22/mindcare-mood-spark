@@ -326,7 +326,8 @@ const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
 
 /** 把记录转成带 BOM 的 CSV 文本（Excel 打开中文不乱码） */
 /** 导出时附带的当天身体数据（由调用方从身体数据模块整理后传入） */
-export type CsvDayInfo = Record<string, { sleep?: string; steps?: number }>;
+/** period 只有在用户勾选"包含周期记录"时才会出现 */
+export type CsvDayInfo = Record<string, { sleep?: string; steps?: number; period?: string }>;
 
 export function entriesToCsv(entries: Entry[], dayInfo: CsvDayInfo = {}): string {
   const header = [
@@ -342,12 +343,14 @@ export function entriesToCsv(entries: Entry[], dayInfo: CsvDayInfo = {}): string
     "调节记录",
     "备注",
   ];
+  const withPeriod = Object.values(dayInfo).some((d) => d.period !== undefined);
+  if (withPeriod) header.splice(9, 0, "周期");
   const rows = sortByNewest(entries).map((e) => {
     const mood = moodOf(e.mood);
     const when = new Date(e.createdAt);
     const pad = (n: number) => String(n).padStart(2, "0");
     const time = `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
-    return [
+    const row = [
       time,
       mood.label,
       String(e.intensity),
@@ -360,6 +363,8 @@ export function entriesToCsv(entries: Entry[], dayInfo: CsvDayInfo = {}): string
       (e.followUps ?? []).map((f) => `${f.label}后 ${f.before}→${f.after}`).join("；"),
       isSample(e) ? "示例数据" : "",
     ];
+    if (withPeriod) row.splice(9, 0, dayInfo[entryDay(e)]?.period ?? "");
+    return row;
   });
   const lines = [header, ...rows].map((row) => row.map(csvCell).join(","));
   return "\uFEFF" + lines.join("\r\n");
