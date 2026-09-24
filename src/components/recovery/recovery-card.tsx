@@ -5,6 +5,7 @@ import { Placeholder } from "@/components/section";
 import { RecoverySetup } from "@/components/recovery/setup";
 import { UrgeFlow } from "@/components/recovery/urge-flow";
 import { UnsentEditor } from "@/components/recovery/unsent-editor";
+import { RecoveryDemo } from "@/components/recovery/recovery-demo";
 import { useRecovery } from "@/hooks/use-recovery";
 import {
   AFTER_CONTACT_FEELINGS,
@@ -22,7 +23,7 @@ import {
 import { recoveryInsight } from "@/lib/recovery-ai";
 import { cn } from "@/lib/utils";
 
-type Sheet = { kind: "setup" } | { kind: "urge"; revisit?: ContactUrge } | { kind: "unsent" } | null;
+type Sheet = { kind: "setup" } | { kind: "demo" } | { kind: "urge"; revisit?: ContactUrge } | { kind: "unsent" } | null;
 
 const chip = (on: boolean) =>
   cn(
@@ -63,6 +64,12 @@ export function RecoveryCard() {
   const sheetEl = (
     <BottomSheet open={!!sheet} onClose={() => setSheet(null)} label="失恋恢复模式">
       {sheet?.kind === "setup" && <RecoverySetup onDone={() => setSheet(null)} />}
+      {sheet?.kind === "demo" && (
+        <RecoveryDemo
+          onClose={() => setSheet(null)}
+          {...(!r.enabled ? { onStart: () => setSheet({ kind: "setup" }) } : {})}
+        />
+      )}
       {sheet?.kind === "urge" && (
         <UrgeFlow onClose={() => setSheet(null)} {...(sheet.revisit ? { revisit: sheet.revisit } : {})} />
       )}
@@ -80,12 +87,20 @@ export function RecoveryCard() {
         <p className="mt-1.5 text-sm leading-relaxed text-foreground/80">
           如果你正在经历分手、暂停联系或反复想联系 TA，可以开启失恋恢复模式。
         </p>
-        <button
-          onClick={() => setSheet({ kind: "setup" })}
-          className="mt-4 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium transition-colors hover:bg-secondary"
-        >
-          开启失恋恢复模式
-        </button>
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button
+            onClick={() => setSheet({ kind: "setup" })}
+            className="rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium transition-colors hover:bg-secondary"
+          >
+            开启失恋恢复模式
+          </button>
+          <button
+            onClick={() => setSheet({ kind: "demo" })}
+            className="text-sm text-foreground/75 underline-offset-4 hover:underline"
+          >
+            先看看怎么用
+          </button>
+        </div>
         {sheetEl}
       </section>
     );
@@ -97,9 +112,14 @@ export function RecoveryCard() {
     <section className="warm-card px-5 py-5 sm:px-7" aria-label="给自己留出空间">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-sm font-medium text-foreground/80">给自己留出空间</p>
-        <Link to="/recovery" className="text-xs text-muted-foreground underline-offset-4 hover:underline">
-          恢复空间
-        </Link>
+        <span className="flex gap-3 text-xs text-muted-foreground">
+          <button onClick={() => setSheet({ kind: "demo" })} className="underline-offset-4 hover:underline">
+            看看怎么用
+          </button>
+          <Link to="/recovery" className="underline-offset-4 hover:underline">
+            恢复空间
+          </Link>
+        </span>
       </div>
 
       {days !== null &&

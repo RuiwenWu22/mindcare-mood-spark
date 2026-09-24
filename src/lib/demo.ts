@@ -7,6 +7,7 @@ import type { Intervention } from "@/lib/interventions";
 import type { DayLog, SleepQuality } from "@/lib/body";
 import { dayKey } from "@/lib/mood";
 import type { Song } from "@/lib/songs";
+import type { ContactUrge, UrgeTrigger } from "@/lib/recovery";
 
 const at = (now: Date, daysAgo: number, hour: number, minute: number) => {
   const d = new Date(now);
@@ -84,4 +85,34 @@ export function demoData(now: Date = new Date()): DemoData {
     source: "shortcut",
   }));
   return { entries, interventions, logs };
+}
+
+/* ---------------- 失恋恢复模式的示例 ---------------- */
+
+/** [几天前, 时, 冲动前, 停一下后, 触发, 没有发送的话] */
+const URGE_ROWS: [number, number, number, number | null, UrgeTrigger[], string][] = [
+  [20, 23, 5, 3, ["night_alone"], "好想你，今天又翻到我们以前的照片。"],
+  [19, 22, 5, 4, ["night_alone", "memory"], "我们真的回不去了吗？"],
+  [17, 1, 4, null, ["dream"], ""],
+  [16, 21, 4, 3, ["saw_post"], "看到你过得挺好，我也不知道该难过还是该放心。"],
+  [15, 14, 4, null, ["memory"], ""],
+  [13, 23, 4, 2, ["night_alone"], "你还会想起我吗？"],
+  [11, 20, 4, 3, ["night_alone", "drink"], ""],
+  [9, 18, 3, null, ["saw_post"], ""],
+  [5, 22, 3, 2, ["night_alone"], "今天又想你了，但我先写在这里。"],
+  [2, 21, 3, 2, ["night_alone"], "其实我只是想被关心一下。"],
+];
+
+/** 示例的联系冲动记录：三周里慢慢变少、变轻，多数发生在晚上 */
+export function recoveryDemo(now: Date = new Date()): { urges: ContactUrge[]; enabledAt: string } {
+  const urges = URGE_ROWS.map(([d, h, before, after, triggers, text], i) => ({
+    id: `demo-urge-${i}`,
+    created_at: at(now, d, h, 10).toISOString(),
+    urge_before: before,
+    ...(after !== null ? { urge_after: after } : {}),
+    triggers,
+    unsent_text: text,
+    action_taken: (after !== null ? "save" : "none") as ContactUrge["action_taken"],
+  }));
+  return { urges, enabledAt: at(now, 22, 9, 0).toISOString() };
 }
