@@ -1,17 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { clearBody, clearSampleBody, restoreSampleBody } from "@/lib/body";
-import { clearDailyData } from "@/lib/daily";
-import { clearWeatherCache } from "@/lib/weather";
-import type { Song } from "@/lib/songs";
 import {
   loadEntries,
   saveEntries,
   sortByNewest,
-  isSample,
-  seedEntries,
-  type ActivityKey,
   type Entry,
-  type FollowUp,
   type MoodKey,
   type TriggerKey,
   detectTriggers,
@@ -43,14 +35,7 @@ export function useEntries() {
   }, []);
 
   const addEntry = useCallback(
-    (input: {
-      mood: MoodKey;
-      intensity: number;
-      note: string;
-      triggers?: TriggerKey[];
-      activity?: ActivityKey | null;
-      song?: Song | null;
-    }) => {
+    (input: { mood: MoodKey; intensity: number; note: string; triggers?: TriggerKey[] }) => {
       const auto = detectTriggers(input.note);
       const triggers = Array.from(new Set([...(input.triggers ?? []), ...auto]));
       const entry: Entry = {
@@ -60,8 +45,6 @@ export function useEntries() {
         intensity: input.intensity,
         note: input.note.trim(),
         triggers,
-        ...(input.activity ? { activity: input.activity } : {}),
-        ...(input.song?.title ? { song: input.song } : {}),
       };
       commit([entry, ...loadEntries()]);
       return entry;
@@ -74,44 +57,5 @@ export function useEntries() {
     [commit],
   );
 
-  /** 清空示例数据，只保留用户自己的记录（之后不会再自动填入示例） */
-  const clearSamples = useCallback(() => {
-    commit(loadEntries().filter((e) => !isSample(e)));
-    clearSampleBody();
-  }, [commit]);
-
-  const addFollowUp = useCallback(
-    (id: string, followUp: FollowUp) =>
-      commit(
-        loadEntries().map((e) =>
-          e.id === id ? { ...e, followUps: [...(e.followUps ?? []), followUp] } : e,
-        ),
-      ),
-    [commit],
-  );
-
-  /** 删除全部记录（包括示例），之后不会再自动填入示例 */
-  const clearAll = useCallback(() => {
-    commit([]);
-    clearBody();
-    clearDailyData();
-    clearWeatherCache();
-  }, [commit]);
-
-  /** 重新载入示例数据，保留用户自己的记录 */
-  const restoreSamples = useCallback(() => {
-    commit([...loadEntries().filter((e) => !isSample(e)), ...seedEntries()]);
-    restoreSampleBody();
-  }, [commit]);
-
-  return {
-    entries,
-    ready,
-    addEntry,
-    removeEntry,
-    clearSamples,
-    addFollowUp,
-    clearAll,
-    restoreSamples,
-  };
+  return { entries, ready, addEntry, removeEntry };
 }
