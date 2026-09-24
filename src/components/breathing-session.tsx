@@ -61,7 +61,7 @@ export function BreathingSession({
       role="dialog"
       aria-modal="true"
       aria-label={plan.title}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 px-6 backdrop-blur-xl"
+      className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-background/95 px-6 backdrop-blur-xl"
     >
       <button
         onClick={close}

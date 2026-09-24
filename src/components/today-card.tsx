@@ -11,7 +11,9 @@ import { CITIES, cityOf, getWeather, type Weather } from "@/lib/weather";
 import { dayKey, entryDay, isSample, moodOf, sortByNewest } from "@/lib/mood";
 import { HOTLINE } from "@/lib/safety";
 import { SignPicker } from "@/components/sign-picker";
-import { FollowUpRating } from "@/components/follow-up-rating";
+import { FeedbackStep } from "@/components/feedback-step";
+import { useInterventions } from "@/hooks/use-interventions";
+import { addIntervention, setAfterScore } from "@/lib/interventions";
 import { Placeholder, Segmented } from "@/components/section";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +27,8 @@ const TABS: { key: Tab; label: string }[] = [
 
 /** 首页的今日卡片：今日一签 + 今日穿搭 + 今日小计划 */
 export function TodayCard({ onWriteNote }: { onWriteNote: () => void }) {
-  const { entries, ready: entriesReady, addFollowUp } = useEntries();
+  const { entries, ready: entriesReady } = useEntries();
+  const { interventions } = useInterventions();
   const { logs, ready: bodyReady, today: todayLog, update: updateBody } = useBody();
   const { profile, state, ready: dailyReady, setProfileAll, updateState } = useDaily();
   const cycle = useCycle();
@@ -35,7 +38,7 @@ export function TodayCard({ onWriteNote }: { onWriteNote: () => void }) {
   const [whyOpen, setWhyOpen] = useState(false);
   const [weekendOpen, setWeekendOpen] = useState(false);
   const [rating, setRating] = useState<PlanItem | null>(null);
-  const [rated, setRated] = useState<string | null>(null);
+  const [ratedId, setRatedId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("sign");
 
   useEffect(() => {
@@ -64,9 +67,10 @@ export function TodayCard({ onWriteNote }: { onWriteNote: () => void }) {
         logs,
         profile,
         weather,
+        interventions,
         ...(cycle.enabled ? { periods: cycle.periods } : {}),
       }),
-    [entries, logs, profile, weather, cycle.enabled, cycle.periods],
+    [entries, logs, profile, weather, interventions, cycle.enabled, cycle.periods],
   );
 
   const shell = "card-soft px-5 py-6 sm:px-7";
@@ -115,7 +119,7 @@ export function TodayCard({ onWriteNote }: { onWriteNote: () => void }) {
         {todayLog?.sleep ? (
           <button
             onClick={() => updateState({ flipped: true })}
-            className="mt-4 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition-transform hover:-translate-y-0.5"
+            className="mt-4 rounded-full border border-border bg-card px-6 py-2.5 text-sm font-medium transition-colors hover:bg-secondary"
           >
             翻开今日一签
           </button>
@@ -215,7 +219,7 @@ export function TodayCard({ onWriteNote }: { onWriteNote: () => void }) {
             aria-expanded={whyOpen}
             className="mt-3 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
-            为什么这样说？
+            为什么这样判断？
             <ChevronDown
               className={cn("h-3.5 w-3.5 transition-transform", whyOpen && "rotate-180")}
             />
@@ -438,7 +442,6 @@ export function TodayCard({ onWriteNote }: { onWriteNote: () => void }) {
                   );
                 })}
               </ul>
-              {rated && <p className="mt-3 text-xs text-muted-foreground">{rated}</p>}
               <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                 <span>做不完也没关系。</span>
                 <button
@@ -452,25 +455,32 @@ export function TodayCard({ onWriteNote }: { onWriteNote: () => void }) {
           )}
 
           {rating && negativeToday && (
-            <FollowUpRating
-              title="做完之后，现在感觉怎么样？"
-              moodLabel={moodOf(negativeToday.mood).label}
-              before={negativeToday.intensity}
-              onSubmit={(after) => {
-                addFollowUp(negativeToday.id, {
-                  method: "activity",
-                  label: rating.title,
-                  before: negativeToday.intensity,
-                  after,
-                  at: new Date().toISOString(),
-                });
-                setRated(
-                  `记下了：「${rating.title}」之后 ${negativeToday.intensity} → ${after}，会出现在洞察页的「什么对我有效」里。`,
-                );
-                setRating(null);
-              }}
-              onSkip={() => setRating(null)}
-            />
+            <div className="mt-5 rounded-2xl border border-border px-4 py-5">
+              <FeedbackStep
+                moodLabel={moodOf(negativeToday.mood).label}
+                before={negativeToday.intensity}
+                negative
+                actionTitle={rating.title}
+                onPick={(after) => {
+                  if (ratedId) setAfterScore(ratedId, after);
+                  else
+                    setRatedId(
+                      addIntervention({
+                        intervention_type: "activity",
+                        intervention_name: rating.title,
+                        before_score: negativeToday.intensity,
+                        after_score: after,
+                        duration: 0,
+                        linked_mood_record_id: negativeToday.id,
+                      }).id,
+                    );
+                }}
+                onDone={() => {
+                  setRating(null);
+                  setRatedId(null);
+                }}
+              />
+            </div>
           )}
         </div>
       )}

@@ -18,7 +18,7 @@ export function SupportCard({
     <div
       role="region"
       aria-label="支持与求助"
-      className="animate-rise mt-8 rounded-3xl border border-border bg-accent-soft/70 px-5 py-6 sm:px-6"
+      className="animate-rise rounded-3xl border border-border bg-accent-soft/70 px-5 py-6 sm:px-6"
     >
       <h3 className="font-display text-lg font-semibold">谢谢你愿意把这些写下来</h3>
       <p className="mt-2 text-sm leading-relaxed text-foreground/85">
