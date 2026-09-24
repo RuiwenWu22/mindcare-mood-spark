@@ -181,8 +181,8 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
         </div>
       )}
 
-      {breathing && (
-        <BreathingSession plan={rec?.breathing} onClose={() => setBreathing(false)} />
+      {breathing && rec && (
+        <BreathingSession plan={rec.breathing} onClose={() => setBreathing(false)} />
       )}
     </section>
 
