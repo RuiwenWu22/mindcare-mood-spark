@@ -12,6 +12,7 @@ import { useRecordSheet } from "@/components/record-sheet";
 import { activityStats, entryScore, lastNDays, moodDistribution, moodOf, songsByMood } from "@/lib/mood";
 import { DAY_PARTS, nextWeekTips, triggerInsight, triggerStats, weeklyDiscovery, whatWorks } from "@/lib/insights";
 import { TRIGGER_DOT_LIMIT, TriggerRows } from "@/components/trigger-rows";
+import { RecoveryInsights } from "@/components/recovery/recovery-insights";
 import { demoData } from "@/lib/demo";
 
 export const Route = createFileRoute("/insights")({
@@ -175,7 +176,12 @@ function InsightsPage() {
             {demoButton}
           </div>
         </AiCard>
-      ) : (
+      ) : null}
+
+      {/* 失恋恢复模式：没有情绪记录时也能看到自己的恢复轨迹 */}
+      {!demo && ready && now && entries.length === 0 && <RecoveryInsights now={now} />}
+
+      {!ready || !discovery || (!demo && entries.length === 0) ? null : (
         <>
           {/* 1. AI 本周发现 */}
           <AiCard title="AI 本周发现" size="lg">
@@ -245,6 +251,9 @@ function InsightsPage() {
               </ul>
             </SectionCard>
           )}
+
+          {/* 失恋恢复模式（开启后才显示） */}
+          {!demo && now && <RecoveryInsights now={now} />}
 
           {/* 4. 7 天情绪趋势 */}
           <SectionCard title="最近 7 天情绪趋势" desc="越高代表那天的感受越轻松；空缺表示那天没有记录。">

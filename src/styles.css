@@ -261,3 +261,30 @@
     animation: none;
   }
 }
+
+/* 失恋恢复模式：浅暖色的次级卡片，不用大面积粉色和红色 */
+@utility warm-card {
+  background-color: color-mix(in oklab, var(--color-sand) 45%, var(--color-card));
+  border: 1px solid color-mix(in oklab, var(--color-sand) 80%, var(--color-border));
+  border-radius: var(--radius-2xl);
+}
+
+@keyframes pause-breathe {
+  0%,
+  100% {
+    transform: scale(0.72);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+@utility animate-pause-breathe {
+  animation: pause-breathe 10s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pause-breathe {
+    animation: none;
+  }
+}

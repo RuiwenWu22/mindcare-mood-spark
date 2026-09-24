@@ -15,6 +15,8 @@ import { Route as CareRouteImport } from './routes/care'
 import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as JournalRouteImport } from './routes/journal'
 import { Route as SyncRouteImport } from './routes/sync'
+import { Route as RecoveryIndexRouteImport } from './routes/recovery/index'
+import { Route as RecoveryMessageRouteImport } from './routes/recovery/message'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +48,16 @@ const SyncRoute = SyncRouteImport.update({
   path: '/sync',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RecoveryIndexRoute = RecoveryIndexRouteImport.update({
+  id: '/recovery/',
+  path: '/recovery/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecoveryMessageRoute = RecoveryMessageRouteImport.update({
+  id: '/recovery/message',
+  path: '/recovery/message',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +66,8 @@ export interface FileRoutesByFullPath {
   '/insights': typeof InsightsRoute
   '/journal': typeof JournalRoute
   '/sync': typeof SyncRoute
+  '/recovery/message': typeof RecoveryMessageRoute
+  '/recovery/': typeof RecoveryIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +76,8 @@ export interface FileRoutesByTo {
   '/insights': typeof InsightsRoute
   '/journal': typeof JournalRoute
   '/sync': typeof SyncRoute
+  '/recovery/message': typeof RecoveryMessageRoute
+  '/recovery': typeof RecoveryIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,13 +87,40 @@ export interface FileRoutesById {
   '/insights': typeof InsightsRoute
   '/journal': typeof JournalRoute
   '/sync': typeof SyncRoute
+  '/recovery/message': typeof RecoveryMessageRoute
+  '/recovery/': typeof RecoveryIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/care' | '/insights' | '/journal' | '/sync'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/care'
+    | '/insights'
+    | '/journal'
+    | '/sync'
+    | '/recovery/message'
+    | '/recovery/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/care' | '/insights' | '/journal' | '/sync'
-  id: '__root__' | '/' | '/about' | '/care' | '/insights' | '/journal' | '/sync'
+  to:
+    | '/'
+    | '/about'
+    | '/care'
+    | '/insights'
+    | '/journal'
+    | '/sync'
+    | '/recovery/message'
+    | '/recovery'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/care'
+    | '/insights'
+    | '/journal'
+    | '/sync'
+    | '/recovery/message'
+    | '/recovery/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -87,6 +130,8 @@ export interface RootRouteChildren {
   InsightsRoute: typeof InsightsRoute
   JournalRoute: typeof JournalRoute
   SyncRoute: typeof SyncRoute
+  RecoveryMessageRoute: typeof RecoveryMessageRoute
+  RecoveryIndexRoute: typeof RecoveryIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -133,6 +178,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SyncRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/recovery/': {
+      id: '/recovery/'
+      path: '/recovery'
+      fullPath: '/recovery/'
+      preLoaderRoute: typeof RecoveryIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recovery/message': {
+      id: '/recovery/message'
+      path: '/recovery/message'
+      fullPath: '/recovery/message'
+      preLoaderRoute: typeof RecoveryMessageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -143,6 +202,8 @@ const rootRouteChildren: RootRouteChildren = {
   InsightsRoute: InsightsRoute,
   JournalRoute: JournalRoute,
   SyncRoute: SyncRoute,
+  RecoveryMessageRoute: RecoveryMessageRoute,
+  RecoveryIndexRoute: RecoveryIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

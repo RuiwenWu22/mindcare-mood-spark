@@ -11,8 +11,9 @@ export function SupportCard({
   onToggleOthers,
 }: {
   onBreathe: () => void;
-  showingOthers: boolean;
-  onToggleOthers: () => void;
+  showingOthers?: boolean;
+  /** 不传时不显示"看看其他自我照顾的方式" */
+  onToggleOthers?: () => void;
 }) {
   return (
     <div
@@ -59,10 +60,12 @@ export function SupportCard({
       </p>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-4 text-xs text-muted-foreground">
-        <span>你的记录已经保存。</span>
-        <button onClick={onToggleOthers} className="underline underline-offset-4 hover:text-foreground">
-          {showingOthers ? "收起其他方式" : "看看其他自我照顾的方式"}
-        </button>
+        <span>你写下的内容已经保存。</span>
+        {onToggleOthers && (
+          <button onClick={onToggleOthers} className="underline underline-offset-4 hover:text-foreground">
+            {showingOthers ? "收起其他方式" : "看看其他自我照顾的方式"}
+          </button>
+        )}
       </div>
     </div>
   );
