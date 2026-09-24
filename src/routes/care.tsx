@@ -1,9 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Footprints, Moon, Music, Wind } from "lucide-react";
+import { Footprints, Moon, Music, Pause, Play, Wind } from "lucide-react";
 import { DailyPrompt } from "@/components/daily-prompt";
 import { BreathingSession } from "@/components/breathing-session";
-import { BREATHING_PLANS } from "@/lib/care-recs";
+import { BREATHING_PLANS, type BreathingKey } from "@/lib/care-recs";
+import { RecommendationPanel } from "@/components/recommendation-panel";
+import { useEntries } from "@/hooks/use-entries";
+import { isSample, moodOf } from "@/lib/mood";
+import { assessRisk } from "@/lib/safety";
+import { AMBIENT_ORDER, AMBIENT_TRACKS, toggleAmbient } from "@/lib/ambient";
+import { useAmbient } from "@/hooks/use-ambient";
 import { toast } from "sonner";
 
 
@@ -19,14 +25,19 @@ export const Route = createFileRoute("/care")({
   component: CarePage,
 });
 
-const PLAN_KEYS = ["slow", "box", "relax478"] as const;
+const PLAN_KEYS: BreathingKey[] = ["slow", "box", "relax478"];
+
+/** 最近多久内的记录，才在自我关怀页顶部做个性化推荐 */
+const RECENT_HOURS = 6;
+
+function agoText(iso: string) {
+  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
+  if (min < 1) return "刚刚";
+  if (min < 60) return `${min} 分钟前`;
+  return `${Math.round(min / 60)} 小时前`;
+}
 
 
-const MUSIC = [
-  { title: "Calm Morning", desc: "清晨的环境音与轻缓和弦", minutes: 12, emoji: "🌤️" },
-  { title: "Soft Piano", desc: "缓慢的钢琴独奏，适合专注或休息", minutes: 18, emoji: "🎹" },
-  { title: "Rainy Evening", desc: "雨声与低频背景，帮助入睡", minutes: 25, emoji: "🌧️" },
-];
 
 const MOVES = [
   { title: "散步 10 分钟", desc: "不带目的地，走的时候留意呼吸和脚步。" },
@@ -41,8 +52,15 @@ const NIGHT = [
 ];
 
 function CarePage() {
-  const [breathing, setBreathing] = useState<string | null>(null);
-  const [playing, setPlaying] = useState<string | null>(null);
+  const [breathing, setBreathing] = useState<BreathingKey | null>(null);
+  const { playing } = useAmbient();
+  const { entries, ready } = useEntries();
+  // 只根据用户自己最近的一条记录做推荐，示例数据不参与
+  const latestOwn = entries.find((e) => !isSample(e));
+  const recent =
+    ready && latestOwn && Date.now() - new Date(latestOwn.createdAt).getTime() < RECENT_HOURS * 3_600_000
+      ? latestOwn
+      : null;
 
   return (
     <div className="space-y-6">
@@ -50,6 +68,22 @@ function CarePage() {
         <h1 className="font-display text-3xl font-semibold tracking-tight">现在，照顾一下自己</h1>
         <p className="mt-2 text-sm text-muted-foreground">选一件最容易做到的，就从它开始。</p>
       </header>
+
+      {recent && (
+        <section className="card-soft px-6 pb-7 pt-1 sm:px-8">
+          <RecommendationPanel
+            key={recent.id}
+            entry={recent}
+            risk={assessRisk({
+              valence: moodOf(recent.mood).valence,
+              intensity: recent.intensity,
+              note: recent.note,
+            })}
+            heading={`根据你${agoText(recent.createdAt)}的记录，更推荐你`}
+            showCareLink={false}
+          />
+        </section>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="card-soft px-6 py-6">
@@ -59,7 +93,7 @@ function CarePage() {
           <h2 className="mt-3 font-display text-xl font-semibold">🧘 挑一个呼吸节奏</h2>
           <ul className="mt-4 space-y-2">
             {PLAN_KEYS.map((k) => {
-              const plan = BREATHING_PLANS[k]!;
+              const plan = BREATHING_PLANS[k];
               return (
                 <li key={k}>
                   <button
@@ -81,16 +115,21 @@ function CarePage() {
             <Music className="h-4 w-4" /> 放松音乐
           </div>
           <h2 className="mt-3 font-display text-xl font-semibold">🎵 挑一段背景声</h2>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            声音由浏览器实时生成，无需下载，到时间会自动淡出。
+          </p>
           <ul className="mt-4 space-y-2">
-            {MUSIC.map((m) => {
-              const active = playing === m.title;
+            {AMBIENT_ORDER.map((id) => {
+              const m = AMBIENT_TRACKS[id];
+              const active = playing === id;
               return (
-                <li key={m.title}>
+                <li key={id}>
                   <button
                     onClick={() => {
-                      setPlaying(active ? null : m.title);
-                      if (!active) toast(`正在播放《${m.title}》的氛围推荐 🎧`);
+                      const started = toggleAmbient(id);
+                      if (!started && !active) toast("当前浏览器暂不支持播放背景声");
                     }}
+                    aria-pressed={active}
                     className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
                       active ? "border-transparent bg-accent-soft" : "border-border hover:bg-secondary"
                     }`}
@@ -100,8 +139,16 @@ function CarePage() {
                       <span className="block text-sm font-medium">{m.title}</span>
                       <span className="block truncate text-xs text-muted-foreground">{m.desc}</span>
                     </span>
-                    <span className="text-xs text-muted-foreground">
-                      {active ? "播放中" : `${m.minutes} 分钟`}
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                      {active ? (
+                        <>
+                          <Pause className="h-3.5 w-3.5" /> 播放中
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-3.5 w-3.5" /> {m.minutes} 分钟
+                        </>
+                      )}
                     </span>
                   </button>
                 </li>
@@ -146,7 +193,7 @@ function CarePage() {
       <DailyPrompt />
 
       {breathing && (
-        <BreathingSession plan={BREATHING_PLANS[breathing]!} onClose={() => setBreathing(null)} />
+        <BreathingSession plan={BREATHING_PLANS[breathing]} onClose={() => setBreathing(null)} />
       )}
 
     </div>

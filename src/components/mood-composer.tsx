@@ -1,21 +1,54 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Footprints, Music, Wind } from "lucide-react";
-import { Link } from "@tanstack/react-router";
-import { MOODS, TRIGGERS, type MoodKey, type TriggerKey } from "@/lib/mood";
-import { recommendFor, type CareRecommendation } from "@/lib/care-recs";
-import { BreathingSession } from "@/components/breathing-session";
+import {
+  ACTIVITIES,
+  MOODS,
+  TRIGGERS,
+  moodOf,
+  type ActivityKey,
+  type Entry,
+  type MoodKey,
+  type TriggerKey,
+} from "@/lib/mood";
+import { assessRisk, type Risk } from "@/lib/safety";
+import { parseSongInput, PLATFORM_LABEL, type Song } from "@/lib/songs";
+import { recentSongs, tokenStatus } from "@/lib/apple-music";
+import { RecommendationPanel } from "@/components/recommendation-panel";
 import { useEntries } from "@/hooks/use-entries";
 import { cn } from "@/lib/utils";
 
-export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?: string }) {
+export function MoodComposer({ title = "你现在感觉怎么样？", id }: { title?: string; id?: string }) {
   const { addEntry } = useEntries();
   const [mood, setMood] = useState<MoodKey | null>(null);
   const [intensity, setIntensity] = useState(5);
+  const [activity, setActivity] = useState<ActivityKey | null>(null);
   const [note, setNote] = useState("");
   const [triggers, setTriggers] = useState<TriggerKey[]>([]);
-  const [rec, setRec] = useState<CareRecommendation | null>(null);
-  const [breathing, setBreathing] = useState(false);
+  const [songInput, setSongInput] = useState("");
+  // 从 Apple Music 最近播放里点选的歌；一旦手动输入就以输入为准
+  const [picked, setPicked] = useState<Song | null>(null);
+  const parsed = useMemo(() => parseSongInput(songInput), [songInput]);
+  const song = picked ?? parsed;
+  const [amOn, setAmOn] = useState(false);
+  const [recent, setRecent] = useState<Song[] | null>(null);
+  const [amBusy, setAmBusy] = useState(false);
+  const [amMsg, setAmMsg] = useState<string | null>(null);
+  useEffect(() => setAmOn(tokenStatus().ok), []);
+
+  const loadRecent = async () => {
+    setAmBusy(true);
+    setAmMsg(null);
+    const r = await recentSongs();
+    setAmBusy(false);
+    if (r.ok) setRecent(r.songs);
+    else setAmMsg(r.error);
+  };
+  const [saved, setSaved] = useState<{ entry: Entry; risk: Risk } | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (saved) resultRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [saved]);
 
   const toggleTrigger = (key: TriggerKey) =>
     setTriggers((prev) => (prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]));
@@ -25,20 +58,29 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
       toast("先选一个此刻最接近的情绪吧");
       return;
     }
-    addEntry({ mood, intensity, note, triggers });
-    setRec(recommendFor(mood, intensity));
+    const entry = addEntry({ mood, intensity, note, triggers, activity, song });
+    const risk = assessRisk({ valence: moodOf(mood).valence, intensity, note });
+    setSaved({ entry, risk });
     setMood(null);
     setIntensity(5);
+    setActivity(null);
     setNote("");
     setTriggers([]);
-    toast.success("今天的情绪已经被好好记录了 🌿", {
-      description: "可以到「情绪日记」里回顾它。",
-    });
+    setSongInput("");
+    setPicked(null);
+    setRecent(null);
+    setAmMsg(null);
+    if (risk === "crisis") {
+      toast("这条记录已经保存");
+    } else {
+      toast.success("今天的情绪已经被好好记录了 🌿", {
+        description: "可以到「情绪日记」里回顾它。",
+      });
+    }
   };
 
-
   return (
-    <section className="card-soft animate-rise px-6 py-7 sm:px-8">
+    <section id={id} className="card-soft animate-rise scroll-mt-24 px-6 py-7 sm:px-8">
       <h2 className="font-display text-xl font-semibold sm:text-2xl">{title}</h2>
       <p className="mt-1.5 text-sm text-muted-foreground">选一个最接近的就好，不用很准确。</p>
 
@@ -49,6 +91,7 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
             <button
               key={m.key}
               onClick={() => setMood(m.key)}
+              aria-pressed={active}
               className={cn(
                 "flex flex-col items-center gap-1.5 rounded-2xl border px-3 py-4 transition-all",
                 active
@@ -68,10 +111,13 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
         <div className="animate-rise mt-7 space-y-6">
           <div>
             <div className="flex items-baseline justify-between">
-              <label className="text-sm font-medium">情绪强度</label>
+              <label htmlFor="intensity" className="text-sm font-medium">
+                情绪强度
+              </label>
               <span className="font-display text-lg">{intensity} / 10</span>
             </div>
             <input
+              id="intensity"
               type="range"
               min={1}
               max={10}
@@ -86,19 +132,31 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
           </div>
 
           <div>
-            <label className="text-sm font-medium">发生了什么？（选填）</label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={4}
-              placeholder="发生了什么？写下此刻的感受……不写也没关系。"
-              className="mt-3 w-full resize-none rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
-            />
+            <span className="text-sm font-medium">此刻在做什么？（可选）</span>
+            <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="此刻在做什么">
+              {ACTIVITIES.map((a) => {
+                const active = activity === a.key;
+                return (
+                  <button
+                    key={a.key}
+                    onClick={() => setActivity(active ? null : a.key)}
+                    aria-pressed={active}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                      active
+                        ? "border-transparent bg-accent-soft font-medium text-foreground"
+                        : "border-border text-muted-foreground hover:bg-secondary",
+                    )}
+                  >
+                    <span aria-hidden>{a.emoji}</span> {a.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div>
-            <label className="text-sm font-medium">触发因素（可多选）</label>
-
+            <span className="text-sm font-medium">和什么有关？（可多选）</span>
             <div className="mt-3 flex flex-wrap gap-2">
               {TRIGGERS.map((t) => {
                 const active = triggers.includes(t.key);
@@ -106,6 +164,7 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
                   <button
                     key={t.key}
                     onClick={() => toggleTrigger(t.key)}
+                    aria-pressed={active}
                     className={cn(
                       "rounded-full border px-3.5 py-1.5 text-sm transition-colors",
                       active
@@ -119,6 +178,102 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
               })}
             </div>
           </div>
+
+          <div>
+            <label htmlFor="note" className="text-sm font-medium">
+              想多说一句吗？（选填）
+            </label>
+            <textarea
+              id="note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={4}
+              placeholder="发生了什么？写下此刻的感受……不写也没关系。"
+              className="mt-3 w-full resize-none rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="song" className="text-sm font-medium">
+              此刻在听什么？（选填）
+            </label>
+            <input
+              id="song"
+              value={songInput}
+              onChange={(e) => {
+                setSongInput(e.target.value);
+                setPicked(null);
+              }}
+              placeholder="粘贴网易云、QQ 音乐或 Apple Music 的分享，或直接输入歌名"
+              className="mt-3 w-full rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
+            />
+            {amOn && !picked && (
+              <div className="mt-2">
+                {!recent ? (
+                  <button
+                    type="button"
+                    onClick={() => void loadRecent()}
+                    disabled={amBusy}
+                    className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-60"
+                  >
+                    {amBusy ? "正在读取 Apple Music……" : "从 Apple Music 最近播放里选"}
+                  </button>
+                ) : (
+                  <div role="group" aria-label="你刚才可能在听">
+                    <p className="text-xs text-muted-foreground">你刚才可能在听（点一下确认，不是的话可以忽略）：</p>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {recent.map((r) => (
+                        <button
+                          type="button"
+                          key={`${r.title}|${r.artist ?? ""}`}
+                          onClick={() => {
+                            setPicked(r);
+                            setSongInput("");
+                          }}
+                          className="rounded-full border border-border bg-card px-3 py-1 text-xs hover:bg-secondary"
+                        >
+                          🎵 {r.title}
+                          {r.artist ? ` · ${r.artist}` : ""}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setRecent(null)}
+                        className="px-1 text-xs text-muted-foreground underline-offset-4 hover:underline"
+                      >
+                        都不是
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {amMsg && <p className="mt-1 text-xs text-muted-foreground">{amMsg}</p>}
+              </div>
+            )}
+            {picked && (
+              <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">
+                已选：🎵《{picked.title}》{picked.artist ? ` · ${picked.artist}` : ""} · 来自 Apple Music 最近播放
+                <button
+                  type="button"
+                  onClick={() => setPicked(null)}
+                  className="ml-2 underline underline-offset-4 hover:text-foreground"
+                >
+                  取消
+                </button>
+              </p>
+            )}
+            {!picked && song && (
+              <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">
+                {song.title ? (
+                  <>
+                    识别为：🎵《{song.title}》{song.artist ? ` · ${song.artist}` : ""}
+                    {song.platform ? ` · ${PLATFORM_LABEL[song.platform]}` : ""}
+                  </>
+                ) : (
+                  "没识别到歌名，可以直接输入歌名。"
+                )}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -129,62 +284,9 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
         保存今天的情绪
       </button>
 
-      {rec && (
-        <div className="animate-rise mt-8 rounded-3xl border border-border bg-primary-soft/60 px-5 py-6 sm:px-6">
-          <h3 className="font-display text-lg font-semibold">为你推荐的几件小事</h3>
-          <p className="mt-1.5 text-sm text-muted-foreground">{rec.intro}</p>
-
-          <div className="mt-5 space-y-3">
-            <div className="rounded-2xl bg-card/85 px-4 py-4">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Wind className="h-4 w-4" /> 呼吸练习
-              </div>
-              <p className="mt-2 text-sm font-medium">{rec.breathing.title}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{rec.breathing.rhythm}</p>
-              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-                {rec.breathing.desc}
-              </p>
-              <button
-                onClick={() => setBreathing(true)}
-                className="mt-3 rounded-full bg-primary px-5 py-2 text-xs font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
-              >
-                开始呼吸练习
-              </button>
-            </div>
-
-            <div className="rounded-2xl bg-card/85 px-4 py-4">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Music className="h-4 w-4" /> 放松音乐
-              </div>
-              <p className="mt-2 text-sm font-medium">
-                {rec.music.emoji} {rec.music.title}
-              </p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{rec.music.desc}</p>
-            </div>
-
-            <div className="rounded-2xl bg-card/85 px-4 py-4">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Footprints className="h-4 w-4" /> 轻运动
-              </div>
-              <p className="mt-2 text-sm font-medium">{rec.move.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{rec.move.desc}</p>
-            </div>
-          </div>
-
-          <p className="mt-4 text-xs leading-relaxed text-foreground/75">🌱 {rec.encouragement}</p>
-          <Link
-            to="/care"
-            className="mt-4 inline-flex text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-          >
-            去自我关怀页看更多
-          </Link>
-        </div>
-      )}
-
-      {breathing && rec && (
-        <BreathingSession plan={rec.breathing} onClose={() => setBreathing(false)} />
-      )}
+      <div ref={resultRef}>
+        {saved && <RecommendationPanel key={saved.entry.id} entry={saved.entry} risk={saved.risk} />}
+      </div>
     </section>
-
   );
 }

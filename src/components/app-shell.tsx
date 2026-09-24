@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, NotebookPen, Sparkles, HeartHandshake } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { AmbientMiniPlayer } from "@/components/ambient-mini-player";
 
 const NAV = [
   { to: "/", label: "首页", icon: Home },
@@ -9,6 +10,9 @@ const NAV = [
   { to: "/insights", label: "情绪洞察", icon: Sparkles },
   { to: "/care", label: "自我关怀", icon: HeartHandshake },
 ] as const;
+
+/** 桌面端多一个"关于"；移动端底栏保持四个主功能，"关于"从页脚进入 */
+const DESKTOP_NAV = [...NAV.map(({ to, label }) => ({ to, label })), { to: "/about", label: "关于" }] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -25,7 +29,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
-            {NAV.map((item) => {
+            {DESKTOP_NAV.map((item) => {
               const active = pathname === item.to;
               return (
                 <Link
@@ -50,18 +54,35 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <footer className="mx-auto max-w-5xl px-5 pb-28 md:pb-10">
         <p className="rounded-2xl bg-secondary/70 px-5 py-4 text-xs leading-relaxed text-muted-foreground">
-          MindCare 是自我关怀工具，不提供医学诊断或心理治疗。如果你正处于危机或有伤害自己的念头，请拨打全国统一心理援助热线
+          MindCare 是自我关怀工具，不提供医学诊断或心理治疗。如果你正处于危机或有伤害自己的念头，请联系你信任的人，或拨打全国统一心理援助热线
           <a href="tel:12356" className="mx-1 font-medium text-foreground underline underline-offset-2">
             12356
           </a>
-          （多地已提供 24 小时服务），或拨打
+          ；如有紧急危险，请拨打
           <a href="tel:120" className="mx-1 font-medium text-foreground underline underline-offset-2">
             120
           </a>
-          联系当地紧急服务。
+          或
+          <a href="tel:110" className="mx-1 font-medium text-foreground underline underline-offset-2">
+            110
+          </a>
+          。
         </p>
+        <nav aria-label="页脚" className="mt-3 flex flex-wrap gap-x-5 gap-y-1 px-1 text-xs text-muted-foreground">
+          <Link to="/about" hash="design" className="underline-offset-4 hover:text-foreground hover:underline">
+            关于 MindCare
+          </Link>
+          <Link to="/about" hash="privacy" className="underline-offset-4 hover:text-foreground hover:underline">
+            数据与隐私
+          </Link>
+          <Link to="/about" hash="help" className="underline-offset-4 hover:text-foreground hover:underline">
+            寻求帮助
+          </Link>
+        </nav>
 
       </footer>
+
+      <AmbientMiniPlayer />
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border/60 bg-background/90 backdrop-blur-xl md:hidden">
         <div className="mx-auto flex max-w-md items-stretch justify-between px-2 py-1.5">

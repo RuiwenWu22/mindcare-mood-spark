@@ -3,8 +3,10 @@ import { useState } from "react";
 import { Download, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { MoodComposer } from "@/components/mood-composer";
+import { SampleNotice } from "@/components/sample-notice";
 import { useEntries } from "@/hooks/use-entries";
-import { downloadCsv, formatDate, moodOf, triggerLabel } from "@/lib/mood";
+import { activityOf, downloadCsv, formatDate, isSample, moodOf, triggerLabel } from "@/lib/mood";
+import { csvDayInfo, loadBody } from "@/lib/body";
 
 export const Route = createFileRoute("/journal")({
   head: () => ({
@@ -39,7 +41,7 @@ function JournalPage() {
                 toast("还没有可以导出的记录");
                 return;
               }
-              downloadCsv(entries);
+              downloadCsv(entries, csvDayInfo(loadBody()));
               toast("情绪记录已导出为 CSV 🌿");
             }}
             disabled={!ready || entries.length === 0}
@@ -57,6 +59,8 @@ function JournalPage() {
           </button>
         </div>
       </header>
+
+      <SampleNotice />
 
       {composing && <MoodComposer title="记录一条新的感受" />}
 
@@ -86,12 +90,47 @@ function JournalPage() {
                       强度 {e.intensity}/10
                     </span>
                     <span className="text-xs text-muted-foreground">{formatDate(e.createdAt)}</span>
+                    {e.activity && (
+                      <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-muted-foreground">
+                        {activityOf(e.activity).emoji} {activityOf(e.activity).label}
+                      </span>
+                    )}
+                    {isSample(e) && (
+                      <span className="rounded-full border border-dashed border-primary/50 px-2 py-0.5 text-[11px] text-muted-foreground">
+                        示例
+                      </span>
+                    )}
                   </div>
                   {e.note && (
                     <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
                       {e.note}
                     </p>
                   )}
+                  {e.song && (
+                    <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span>
+                        🎵《{e.song.title}》{e.song.artist ? ` · ${e.song.artist}` : ""}
+                      </span>
+                      {e.song.url && (
+                        <a
+                          href={e.song.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-2 hover:text-foreground"
+                        >
+                          去听
+                        </a>
+                      )}
+                    </p>
+                  )}
+                  {(e.followUps ?? []).map((f) => (
+                    <p key={f.at} className="mt-3 text-xs text-muted-foreground">
+                      🫁 {f.label}后：
+                      <span className="font-medium text-foreground/80">
+                        {f.before} → {f.after}
+                      </span>
+                    </p>
+                  ))}
                   {e.triggers.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {e.triggers.map((t) => (
