@@ -50,7 +50,7 @@ const DECISIONS: [string, string][] = [
   ],
   [
     "此刻的 BGM",
-    "听歌是年轻人最常见的调节方式之一。只记录你主动分享的歌，不读取听歌记录，也不从歌推断心情。",
+    "听歌是年轻人最常见的调节方式之一。只记录你主动分享的歌；连接 Apple Music 后，也只是列出最近播放的 3 首让你点选确认，不从歌推断心情。",
   ],
   [
     "场景维度借鉴微信状态",
@@ -173,6 +173,12 @@ function AboutPage() {
             <dt className="font-medium">星座、城市和天气</dt>
             <dd className="mt-1 text-foreground/80">
               只保存你选的星座和城市，不保存生日（用生日算星座时，生日只在当下用一次）。选择城市后，会用城市坐标向 Open-Meteo 查询当天天气，不会发送你的任何记录。
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium">Apple Music</dt>
+            <dd className="mt-1 text-foreground/80">
+              只有在你点「从 Apple Music 最近播放里选」时，才会加载 Apple 的 MusicKit 并请求授权，读取最近播放的歌曲，列出前 3 首。只保存你点选确认的那一首，不保存听歌记录。授权由 Apple 管理，可以随时在 Apple 账号设置里撤销。
             </dd>
           </div>
           <div>

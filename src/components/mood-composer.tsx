@@ -11,7 +11,8 @@ import {
   type TriggerKey,
 } from "@/lib/mood";
 import { assessRisk, type Risk } from "@/lib/safety";
-import { parseSongInput, PLATFORM_LABEL } from "@/lib/songs";
+import { parseSongInput, PLATFORM_LABEL, type Song } from "@/lib/songs";
+import { recentSongs, tokenStatus } from "@/lib/apple-music";
 import { RecommendationPanel } from "@/components/recommendation-panel";
 import { useEntries } from "@/hooks/use-entries";
 import { cn } from "@/lib/utils";
@@ -24,7 +25,24 @@ export function MoodComposer({ title = "你现在感觉怎么样？", id }: { ti
   const [note, setNote] = useState("");
   const [triggers, setTriggers] = useState<TriggerKey[]>([]);
   const [songInput, setSongInput] = useState("");
-  const song = useMemo(() => parseSongInput(songInput), [songInput]);
+  // 从 Apple Music 最近播放里点选的歌；一旦手动输入就以输入为准
+  const [picked, setPicked] = useState<Song | null>(null);
+  const parsed = useMemo(() => parseSongInput(songInput), [songInput]);
+  const song = picked ?? parsed;
+  const [amOn, setAmOn] = useState(false);
+  const [recent, setRecent] = useState<Song[] | null>(null);
+  const [amBusy, setAmBusy] = useState(false);
+  const [amMsg, setAmMsg] = useState<string | null>(null);
+  useEffect(() => setAmOn(tokenStatus().ok), []);
+
+  const loadRecent = async () => {
+    setAmBusy(true);
+    setAmMsg(null);
+    const r = await recentSongs();
+    setAmBusy(false);
+    if (r.ok) setRecent(r.songs);
+    else setAmMsg(r.error);
+  };
   const [saved, setSaved] = useState<{ entry: Entry; risk: Risk } | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +67,9 @@ export function MoodComposer({ title = "你现在感觉怎么样？", id }: { ti
     setNote("");
     setTriggers([]);
     setSongInput("");
+    setPicked(null);
+    setRecent(null);
+    setAmMsg(null);
     if (risk === "crisis") {
       toast("这条记录已经保存");
     } else {
@@ -179,11 +200,68 @@ export function MoodComposer({ title = "你现在感觉怎么样？", id }: { ti
             <input
               id="song"
               value={songInput}
-              onChange={(e) => setSongInput(e.target.value)}
+              onChange={(e) => {
+                setSongInput(e.target.value);
+                setPicked(null);
+              }}
               placeholder="粘贴网易云、QQ 音乐或 Apple Music 的分享，或直接输入歌名"
               className="mt-3 w-full rounded-2xl border border-border bg-secondary/40 px-4 py-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
             />
-            {song && (
+            {amOn && !picked && (
+              <div className="mt-2">
+                {!recent ? (
+                  <button
+                    type="button"
+                    onClick={() => void loadRecent()}
+                    disabled={amBusy}
+                    className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-60"
+                  >
+                    {amBusy ? "正在读取 Apple Music……" : "从 Apple Music 最近播放里选"}
+                  </button>
+                ) : (
+                  <div role="group" aria-label="你刚才可能在听">
+                    <p className="text-xs text-muted-foreground">你刚才可能在听（点一下确认，不是的话可以忽略）：</p>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {recent.map((r) => (
+                        <button
+                          type="button"
+                          key={`${r.title}|${r.artist ?? ""}`}
+                          onClick={() => {
+                            setPicked(r);
+                            setSongInput("");
+                          }}
+                          className="rounded-full border border-border bg-card px-3 py-1 text-xs hover:bg-secondary"
+                        >
+                          🎵 {r.title}
+                          {r.artist ? ` · ${r.artist}` : ""}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setRecent(null)}
+                        className="px-1 text-xs text-muted-foreground underline-offset-4 hover:underline"
+                      >
+                        都不是
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {amMsg && <p className="mt-1 text-xs text-muted-foreground">{amMsg}</p>}
+              </div>
+            )}
+            {picked && (
+              <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">
+                已选：🎵《{picked.title}》{picked.artist ? ` · ${picked.artist}` : ""} · 来自 Apple Music 最近播放
+                <button
+                  type="button"
+                  onClick={() => setPicked(null)}
+                  className="ml-2 underline underline-offset-4 hover:text-foreground"
+                >
+                  取消
+                </button>
+              </p>
+            )}
+            {!picked && song && (
               <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">
                 {song.title ? (
                   <>
