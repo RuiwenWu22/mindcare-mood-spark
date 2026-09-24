@@ -96,6 +96,8 @@ function InsightsPage() {
 
   const dist = moodDistribution(entries);
   const triggers = triggerRanking(entries);
+  const breakdown = triggerMoodBreakdown(entries, 5);
+  const slots = timeOfDayStats(entries);
   const insight = analyzeEntries(entries);
 
   if (ready && entries.length === 0) {
