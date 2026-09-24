@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { MoodComposer } from "@/components/mood-composer";
-import { DailyPrompt } from "@/components/daily-prompt";
+import { TodayCard } from "@/components/today-card";
 import { SampleNotice } from "@/components/sample-notice";
 import { useEntries } from "@/hooks/use-entries";
 import { useBody } from "@/hooks/use-body";
+import { useDaily } from "@/hooks/use-daily";
 import { isSample, moodOf, weekCount } from "@/lib/mood";
 import { ACTIVITY_LEVELS, SLEEP_OPTIONS, levelOf, sleepOf } from "@/lib/body";
 
@@ -31,6 +32,8 @@ function Index() {
   const todayEntry = own.find((e) => new Date(e.createdAt).toDateString() === today);
   const body = useBody();
   const tb = body.today;
+  // 翻签前，睡眠问题由今日卡片来问，避免同一屏问两次
+  const daily = useDaily();
 
   const chip =
     "rounded-full border border-border px-2.5 py-1 text-xs transition-colors hover:bg-secondary";
@@ -61,7 +64,11 @@ function Index() {
 
         <div className="card-soft px-5 py-4">
           <p className="text-xs text-muted-foreground">昨晚睡眠</p>
-          {tb?.sleep ? (
+          {!body.ready || !daily.ready ? (
+            <p className="mt-2 font-display text-lg font-medium">—</p>
+          ) : !tb?.sleep && !daily.state.flipped ? (
+            <p className="mt-2 text-sm text-muted-foreground">翻开今日一签时记录</p>
+          ) : tb?.sleep ? (
             <div className="mt-2 flex items-baseline justify-between gap-2">
               <p className="font-display text-lg font-medium">
                 {sleepOf(tb.sleep).emoji} {sleepOf(tb.sleep).label}
@@ -86,7 +93,9 @@ function Index() {
 
         <div className="card-soft px-5 py-4">
           <p className="text-xs text-muted-foreground">今日活动</p>
-          {tb?.steps !== undefined ? (
+          {!body.ready ? (
+            <p className="mt-2 font-display text-lg font-medium">—</p>
+          ) : tb?.steps !== undefined ? (
             <>
               <p className="mt-2 font-display text-lg font-medium">{tb.steps.toLocaleString("zh-CN")} 步</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -101,8 +110,13 @@ function Index() {
             <>
               <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="今天动得多吗">
                 {ACTIVITY_LEVELS.map((o) => (
-                  <button key={o.key} onClick={() => body.update({ level: o.key, source: "manual" })} className={chip}>
-                    {o.emoji} {o.label}
+                  <button
+                    key={o.key}
+                    onClick={() => body.update({ level: o.key, source: "manual" })}
+                    aria-label={o.label}
+                    className={chip}
+                  >
+                    {o.emoji} {o.short}
                   </button>
                 ))}
               </div>
@@ -119,9 +133,11 @@ function Index() {
         </div>
       </section>
 
-      <MoodComposer />
+      <TodayCard
+        onWriteNote={() => document.getElementById("record")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+      />
 
-      <DailyPrompt />
+      <MoodComposer id="record" />
 
       <section className="grid gap-3 sm:grid-cols-2">
         <Link to="/insights" className="card-lift flex items-center justify-between px-6 py-5">

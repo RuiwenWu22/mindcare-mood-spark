@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { clearBody, clearSampleBody, restoreSampleBody } from "@/lib/body";
+import { clearDailyData } from "@/lib/daily";
+import { clearWeatherCache } from "@/lib/weather";
 import type { Song } from "@/lib/songs";
 import {
   loadEntries,
@@ -92,6 +94,8 @@ export function useEntries() {
   const clearAll = useCallback(() => {
     commit([]);
     clearBody();
+    clearDailyData();
+    clearWeatherCache();
   }, [commit]);
 
   /** 重新载入示例数据，保留用户自己的记录 */

@@ -119,7 +119,8 @@ export const activityOf = (key: ActivityKey) => ACTIVITIES.find((a) => a.key ===
 
 /** 一次自助调节前后的强度变化，用来验证"什么对我有效" */
 export type FollowUp = {
-  method: "breathing";
+  /** breathing：呼吸练习；activity：今日小计划里的一件事 */
+  method: "breathing" | "activity";
   /** 具体做了什么，例如"箱式呼吸 4-4-4-4" */
   label: string;
   before: number;
@@ -182,6 +183,8 @@ const daysAgo = (n: number, hour = 21) => {
   const d = new Date();
   d.setDate(d.getDate() - n);
   d.setHours(hour, 12, 0, 0);
+  const now = Date.now();
+  if (d.getTime() > now) return new Date(now - 5 * 60_000).toISOString();
   return d.toISOString();
 };
 
@@ -496,6 +499,7 @@ export function weekCount(entries: Entry[]) {
 /** 负向情绪下，每种调节方法前后的强度变化。正向情绪的强度下降不代表"变好"，不计入 */
 export type MethodStat = {
   label: string;
+  method: FollowUp["method"];
   count: number;
   avgBefore: number;
   avgAfter: number;
@@ -507,11 +511,14 @@ export type MethodStat = {
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export function whatWorks(entries: Entry[]): MethodStat[] {
-  const acc = new Map<string, { count: number; before: number; after: number; own: number }>();
+  const acc = new Map<
+    string,
+    { count: number; before: number; after: number; own: number; method: FollowUp["method"] }
+  >();
   for (const e of entries) {
     if (moodOf(e.mood).valence >= 0) continue;
     for (const f of e.followUps ?? []) {
-      const a = acc.get(f.label) ?? { count: 0, before: 0, after: 0, own: 0 };
+      const a = acc.get(f.label) ?? { count: 0, before: 0, after: 0, own: 0, method: f.method };
       a.count += 1;
       a.before += f.before;
       a.after += f.after;
@@ -522,6 +529,7 @@ export function whatWorks(entries: Entry[]): MethodStat[] {
   return [...acc.entries()]
     .map(([label, a]) => ({
       label,
+      method: a.method,
       count: a.count,
       avgBefore: round1(a.before / a.count),
       avgAfter: round1(a.after / a.count),

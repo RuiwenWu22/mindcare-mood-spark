@@ -387,7 +387,7 @@ function InsightsPage() {
               >
                 <div>
                   <p className="text-sm font-medium">
-                    🫁 {m.label}
+                    {m.method === "breathing" ? "🫁" : "🌿"} {m.label}
                     {i === 0 && m.avgDrop >= 1 && (
                       <span className="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-normal">
                         目前最有效

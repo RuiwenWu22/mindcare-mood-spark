@@ -6,7 +6,9 @@ export function FollowUpRating({
   before,
   onSubmit,
   onSkip,
+  title = "练完之后，现在感觉怎么样？",
 }: {
+  title?: string;
   moodLabel: string;
   before: number;
   onSubmit: (after: number) => void;
@@ -14,7 +16,7 @@ export function FollowUpRating({
 }) {
   return (
     <div className="animate-rise mt-8 rounded-3xl border border-border bg-card px-5 py-6 sm:px-6">
-      <h3 className="font-display text-lg font-semibold">练完之后，现在感觉怎么样？</h3>
+      <h3 className="font-display text-lg font-semibold">{title}</h3>
       <p className="mt-1.5 text-sm text-muted-foreground">
         此刻的「{moodLabel}」有多强烈？刚才是 {before} / 10。
       </p>

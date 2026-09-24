@@ -15,10 +15,10 @@ export const SLEEP_OPTIONS: { key: SleepQuality; label: string; emoji: string }[
   { key: "poor", label: "很差", emoji: "😵" },
 ];
 
-export const ACTIVITY_LEVELS: { key: ActivityLevel; label: string; emoji: string }[] = [
-  { key: "low", label: "动得很少", emoji: "🛋️" },
-  { key: "mid", label: "一般", emoji: "🚶" },
-  { key: "high", label: "动得很多", emoji: "🏃" },
+export const ACTIVITY_LEVELS: { key: ActivityLevel; label: string; short: string; emoji: string }[] = [
+  { key: "low", label: "动得很少", short: "很少", emoji: "🛋️" },
+  { key: "mid", label: "一般", short: "一般", emoji: "🚶" },
+  { key: "high", label: "动得很多", short: "很多", emoji: "🏃" },
 ];
 
 export const sleepOf = (k: SleepQuality) => SLEEP_OPTIONS.find((o) => o.key === k)!;

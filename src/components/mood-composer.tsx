@@ -16,7 +16,7 @@ import { RecommendationPanel } from "@/components/recommendation-panel";
 import { useEntries } from "@/hooks/use-entries";
 import { cn } from "@/lib/utils";
 
-export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?: string }) {
+export function MoodComposer({ title = "你现在感觉怎么样？", id }: { title?: string; id?: string }) {
   const { addEntry } = useEntries();
   const [mood, setMood] = useState<MoodKey | null>(null);
   const [intensity, setIntensity] = useState(5);
@@ -59,7 +59,7 @@ export function MoodComposer({ title = "你现在感觉怎么样？" }: { title?
   };
 
   return (
-    <section className="card-soft animate-rise px-6 py-7 sm:px-8">
+    <section id={id} className="card-soft animate-rise scroll-mt-24 px-6 py-7 sm:px-8">
       <h2 className="font-display text-xl font-semibold sm:text-2xl">{title}</h2>
       <p className="mt-1.5 text-sm text-muted-foreground">选一个最接近的就好，不用很准确。</p>
 
