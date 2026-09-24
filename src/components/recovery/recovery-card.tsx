@@ -31,8 +31,11 @@ const chip = (on: boolean) =>
     on ? "border-primary/70 bg-primary-soft font-medium" : "border-border bg-card text-muted-foreground hover:bg-secondary",
   );
 
-/** 今天页上的失恋恢复模式：没开启时是一张次级场景卡，开启后是「给自己留出空间」 */
-export function RecoveryCard() {
+/**
+ * 失恋恢复模式的主卡片「给自己留出空间」，放在「恢复空间」页面顶部
+ * （今天页的「特别时期 → 感情变化」只显示一句状态）。
+ */
+export function RecoveryCard({ inHub = false }: { inHub?: boolean }) {
   const r = useRecovery();
   const [sheet, setSheet] = useState<Sheet>(null);
   const [now, setNow] = useState<Date | null>(null);
@@ -112,14 +115,16 @@ export function RecoveryCard() {
     <section className="warm-card px-5 py-5 sm:px-7" aria-label="给自己留出空间">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-sm font-medium text-foreground/80">给自己留出空间</p>
-        <span className="flex gap-3 text-xs text-muted-foreground">
-          <button onClick={() => setSheet({ kind: "demo" })} className="underline-offset-4 hover:underline">
-            看看怎么用
-          </button>
-          <Link to="/recovery" className="underline-offset-4 hover:underline">
-            恢复空间
-          </Link>
-        </span>
+        {!inHub && (
+          <span className="flex gap-3 text-xs text-muted-foreground">
+            <button onClick={() => setSheet({ kind: "demo" })} className="underline-offset-4 hover:underline">
+              看看怎么用
+            </button>
+            <Link to="/recovery" className="underline-offset-4 hover:underline">
+              恢复空间
+            </Link>
+          </span>
+        )}
       </div>
 
       {days !== null &&

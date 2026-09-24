@@ -5,6 +5,7 @@
  * 语气：用"似乎""可能"，不做诊断，不说"你一定""你就是因为"。
  */
 import { moodOf, triggerLabel, type Entry, type MoodKey, type TriggerKey } from "@/lib/mood";
+import { eventOf } from "@/lib/scenarios";
 
 export type Understanding = { text: string; evidence: string[] };
 
@@ -87,7 +88,12 @@ export function understandEntry(
 ): Understanding {
   const mood = moodOf(entry.mood);
   const noun = NOUN[entry.mood];
-  const themes = readThemes(entry.note);
+  // 特别时期里选的"发生了什么"放在最前面，再加上从文字里读到的原因
+  const ev = eventOf(entry.record_type, entry.event);
+  const themes = [
+    ...(ev?.phrase ? [{ phrase: ev.phrase, quote: "" }] : []),
+    ...readThemes(entry.note),
+  ].slice(0, 2);
   const tags = (chosen ?? entry.triggers).filter((t) => t !== "other");
   const quoted = tags.map((t) => `「${triggerLabel(t)}」`);
   const tagText = quoted.join("、");
@@ -119,8 +125,9 @@ export function understandEntry(
   }
 
   // 依据：只列这条记录里真实存在的信息
-  const quotes = themes.map((t) => t.quote);
+  const quotes = themes.map((t) => t.quote).filter(Boolean);
   const source = chosen ? "你选择的" : "这条记录的";
+  if (ev && ev.key !== "other") evidence.push(`你记下的事情是「${ev.label}」。`);
   if (tags.length && quotes.length) {
     evidence.push(`基于${source}${tagText}标签，以及记录中提到的${joinQuotes(quotes)}。`);
   } else if (tags.length) {

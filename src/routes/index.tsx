@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { TodayCard } from "@/components/today-card";
-import { RecoveryCard } from "@/components/recovery/recovery-card";
+import { SpecialTimes } from "@/components/special-times";
 import { Placeholder } from "@/components/section";
 import { useRecordSheet } from "@/components/record-sheet";
 import { WhyToggle } from "@/components/ai-card";
@@ -85,13 +85,22 @@ function TodayPage() {
         </ol>
       </section>
 
-      {/* ---------- 今天的记录：AI 整理 + 调节结果 ---------- */}
-      {today && <TodayRecord entries={entries} interventions={interventions} data={today} />}
-
-      {/* ---------- 失恋恢复模式：次级场景卡 ---------- */}
-      <RecoveryCard />
-
+      {/* ---------- 睡眠、活动 ---------- */}
       <TodayStatus />
+
+      {/* ---------- 特别时期：次级入口 ---------- */}
+      <SpecialTimes />
+
+      {/* ---------- AI 当下建议：今天记录的整理 + 此刻更适合你 ---------- */}
+      {today ? (
+        <TodayRecord entries={entries} interventions={interventions} data={today} />
+      ) : (
+        ready && (
+          <p className="px-1 text-sm leading-relaxed text-muted-foreground">
+            ✨ 记一下此刻的感受，AI 会帮你整理可能的原因，并推荐一个现在就能做的方法。
+          </p>
+        )
+      )}
 
       <TodayCard onWriteNote={() => open()} />
 

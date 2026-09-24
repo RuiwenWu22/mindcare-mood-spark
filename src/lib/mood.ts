@@ -1,5 +1,6 @@
 import { sanitizeSong, songKey, type Song } from "@/lib/songs";
 import { appendInterventions, type Intervention } from "@/lib/interventions";
+import { eventOf, isRecordType, recordTypeOf, type RecordType } from "@/lib/scenarios";
 
 /**
  * MindCare 核心数据层
@@ -44,6 +45,7 @@ export const moodOf = (key: MoodKey): Mood => MOODS.find((m) => m.key === key) ?
 export type TriggerKey =
   | "work"
   | "study"
+  | "family"
   | "relationship"
   | "intimate"
   | "sleep"
@@ -64,14 +66,19 @@ export const TRIGGERS: { key: TriggerKey; label: string; keywords: string[] }[] 
     keywords: ["学习", "考试", "论文", "作业", "上课", "复习", "老师", "导师", "考研", "读研", "成绩", "期末", "答辩"],
   },
   {
-    key: "relationship",
-    label: "人际",
-    keywords: ["朋友", "室友", "同学", "家人", "父母", "妈妈", "爸爸", "家里", "吵架", "误会", "社交", "沟通"],
+    key: "family",
+    label: "家庭",
+    keywords: ["家人", "父母", "妈妈", "爸爸", "家里", "催婚", "亲戚", "爸妈"],
   },
   {
     key: "intimate",
-    label: "亲密关系",
+    label: "感情",
     keywords: ["对象", "男朋友", "女朋友", "男友", "女友", "恋爱", "分手", "暧昧", "伴侣", "老公", "老婆", "喜欢的人"],
+  },
+  {
+    key: "relationship",
+    label: "人际",
+    keywords: ["朋友", "室友", "同学", "吵架", "误会", "社交", "沟通"],
   },
   { key: "sleep", label: "睡眠", keywords: ["失眠", "睡不着", "没睡好", "熬夜", "早醒", "睡眠"] },
   { key: "body", label: "身体", keywords: ["生病", "感冒", "头疼", "头痛", "胃", "发烧", "痛经", "不舒服", "疲惫"] },
@@ -79,9 +86,8 @@ export const TRIGGERS: { key: TriggerKey; label: string; keywords: string[] }[] 
   { key: "other", label: "其他", keywords: [] },
 ];
 
-/** 旧版本的标签归到现在的 8 个里 */
+/** 旧版本的标签归到现在的标签里 */
 const LEGACY_TRIGGER_KEYS: Record<string, TriggerKey> = {
-  family: "relationship",
   health: "body",
   future: "other",
   social: "other",
@@ -93,6 +99,23 @@ const LEGACY_TRIGGER_KEYS: Record<string, TriggerKey> = {
 
 export const triggerLabel = (key: string) =>
   TRIGGERS.find((t) => t.key === (LEGACY_TRIGGER_KEYS[key] ?? key))?.label ?? key;
+
+/**
+ * 统一的触发类别名称（和产品文档一致）。内部 key 保持不变以兼容旧数据：
+ * intimate = 感情（relationship），relationship = 人际（social），body = 身体（health）
+ */
+const TRIGGER_CATEGORY: Record<TriggerKey, string> = {
+  work: "work",
+  study: "study",
+  family: "family",
+  intimate: "relationship",
+  relationship: "social",
+  sleep: "sleep",
+  body: "health",
+  money: "money",
+  other: "other",
+};
+export const triggerCategory = (key: string) => TRIGGER_CATEGORY[(LEGACY_TRIGGER_KEYS[key] ?? key) as TriggerKey] ?? "other";
 
 /* ---------------- 场景：此刻在做什么 ---------------- */
 /** 灵感来自微信状态：年轻人描述自己时，常说的是"在做什么"，而不只是"感觉如何" */
@@ -142,6 +165,10 @@ export type Entry = {
   sample?: boolean;
   /** 强度量表：5 表示 1–5。旧数据（1–10）读取时会换算 */
   scale?: 5;
+  /** 日常，或者在某个特别时期里记下的；旧数据没有这个字段，读取时当作 daily */
+  record_type?: RecordType;
+  /** 特别时期里"发生了什么"，例如工作里的 rejected（方案被否） */
+  event?: string;
 };
 
 /** 旧版本存在记录里的调节结果（1–10），读取时迁移到独立的调节记录 */
@@ -213,6 +240,9 @@ export function loadEntries(): Entry[] {
       };
       if (old || (rest.triggers ?? []).some((t) => !TRIGGERS.some((x) => x.key === t))) changed = true;
       if (activity && ACTIVITY_KEYS.has(activity)) clean.activity = activity;
+      // 旧数据没有记录类型：只在内存里当作日常，不改写存储
+      clean.record_type = isRecordType(rest.record_type) ? rest.record_type : "daily";
+      if (typeof rest.event !== "string" || !rest.event) delete clean.event;
       const safeSong = sanitizeSong(song);
       if (safeSong) clean.song = safeSong;
       if (Array.isArray(followUps) && followUps.length) {
@@ -271,6 +301,8 @@ export function entriesToCsv(entries: Entry[], dayInfo: CsvDayInfo = {}, interve
     "当天睡眠",
     "当天步数",
     "调节记录",
+    "记录类型",
+    "事件",
     "备注",
   ];
   const withPeriod = Object.values(dayInfo).some((d) => d.period !== undefined);
@@ -294,6 +326,8 @@ export function entriesToCsv(entries: Entry[], dayInfo: CsvDayInfo = {}, interve
         .filter((iv) => iv.linked_mood_record_id === e.id)
         .map((iv) => `${iv.intervention_name}后 ${iv.before_score}→${iv.after_score}`)
         .join("；"),
+      recordTypeOf(e.record_type ?? "daily").label,
+      eventOf(e.record_type, e.event)?.label ?? "",
       "",
     ];
     if (withPeriod) row.splice(9, 0, dayInfo[entryDay(e)]?.period ?? "");

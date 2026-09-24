@@ -123,7 +123,7 @@ export function RecoveryDemo({ onClose, onStart }: { onClose: () => void; onStar
     },
     {
       title: "几次之后，会看到自己的规律",
-      why: "洞察里的「最近的恢复轨迹」会统计冲动次数、强度、停一下前后的变化和常见的触发时刻。",
+      why: "「洞察 → 触发因素」里的「最近的恢复轨迹」会统计冲动次数、强度、停一下前后的变化和常见的触发时刻。",
       body: (
         <AiCard title="AI 发现">
           <div className="space-y-1.5 text-[15px] leading-relaxed">

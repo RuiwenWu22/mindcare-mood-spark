@@ -7,6 +7,7 @@ import { Placeholder, SectionCard } from "@/components/section";
 import { RecoverySetup } from "@/components/recovery/setup";
 import { UnsentAnalysis, UnsentEditor } from "@/components/recovery/unsent-editor";
 import { RecoveryDemo } from "@/components/recovery/recovery-demo";
+import { RecoveryCard } from "@/components/recovery/recovery-card";
 import { useRecovery } from "@/hooks/use-recovery";
 import {
   RELATIONSHIP_STATUS,
@@ -45,7 +46,8 @@ function RecoveryPage() {
         <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> 今天
         </Link>
-        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">恢复空间</h1>
+        <p className="mt-3 text-xs text-muted-foreground">特别时期 · 💔 感情变化</p>
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">恢复空间</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           这里的内容只保存在这台设备上，不会发送给任何人。
           <button onClick={() => setDemo(true)} className="ml-1 underline underline-offset-4 hover:text-foreground">
@@ -62,6 +64,9 @@ function RecoveryPage() {
         </section>
       ) : (
         <>
+          {/* ---------- 给自己留出空间：我现在很想联系 TA ---------- */}
+          <RecoveryCard inHub />
+
           {/* ---------- 没有发送的话 ---------- */}
           <SectionCard
             title="没有发送的话"
